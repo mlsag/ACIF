@@ -1,0 +1,5 @@
+verdade: branch principal(main)
+->Branches: estado/momento dc dev
+            ->feature / id atividade - titulo
+            ->hotfix / id atividade - titulo
+            ->bug / id atividade - titulo
