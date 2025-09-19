@@ -1,0 +1,7 @@
+name:  PGP CI
+on: [push, pull_request]
+jobs: 
+  test:
+    runs-on: python-latest
+    steps:
+    - run: echo "hello world"
