@@ -10,7 +10,7 @@ description: Use para decidir qual task do ACIF fazer agora. Calcula as tasks el
 ## Passos
 
 1. Leia `docs/backlog.yaml` e obtenha a data atual com `date +%F`.
-2. Calcule as elegíveis: `status: todo`, com todas as tasks de `depende` em `done`. Uma dependência `cut` bloqueia a task até o aluno decidir.
+2. Calcule as elegíveis: `status: todo`, com todas as tasks de `depende` em `done` e todos os ADRs de `depende_adr`, se houver, com status Aceito ou Rejeitado em `docs/adr/`. Uma dependência `cut` bloqueia a task até o aluno decidir.
 3. Encontre o marco corrente: aquele cujo período contém a data atual. Em BUF ou ENT, considere o marco mais antigo com tasks abertas.
 4. Identifique os marcos atrasados: `fim` anterior à data atual e tasks N1 ou IA ainda abertas. Calcule os dias de atraso.
 5. Ordene as elegíveis por:

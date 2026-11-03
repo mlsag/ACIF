@@ -4,6 +4,10 @@
 # Replanejamento de 03/11/2026 (detalhes em docs/roadmap.md):
 # - marcos redistribuídos entre 03/11 e 30/11/2026;
 # - T15 antecipada de M2 para M1; T08 passa a depender de T15;
+# - T15 depende de T01 e só do ADR 0006, em vez da T05 inteira;
+#
+# Campo opcional depende_adr: ADRs que precisam estar decididos (Aceito ou
+# Rejeitado) para a task ser elegível. Ausente equivale a nenhum.
 # - T10 inclui as telas do formulário público do aluno e de cadastro e aprovação de docentes;
 # - T05 inclui os ADRs 0008 e 0009;
 # - T33 (N3) nasce como cut e sem agente.
@@ -252,7 +256,8 @@ tasks:
     marco: M1
     nivel: N1
     agente: integracao
-    depende: [T05]
+    depende: [T01]
+    depende_adr: ["0006"]
     titulo: "CanalEnvio + registry + EmailCanal"
     aceite:
       - "E-mail real chega em conta de teste"

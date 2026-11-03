@@ -12,6 +12,7 @@ argument-hint: <ID>
 
 1. **Validar.** Leia `docs/backlog.yaml` e obtenha a data com `date +%F`. Pare se:
    - a task não existe, não está `todo` ou tem dependência fora de `done`;
+   - algum ADR de `depende_adr` ainda não está Aceito ou Rejeitado;
    - é N3 (nunca entra);
    - é N2 e há marco atrasado (`fim` anterior à data atual, com N1 ou IA abertas): recuse e cite a regra de corte;
    - é uma feature nova depois do congelamento de 21/11/2026: peça decisão do aluno;
