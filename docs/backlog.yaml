@@ -11,6 +11,13 @@
 # - T10 inclui as telas do formulário público do aluno e de cadastro e aprovação de docentes;
 # - T05 inclui os ADRs 0008 e 0009;
 # - T33 (N3) nasce como cut e sem agente.
+#
+# Decisões do orientador registradas em 03/11 e 04/11/2026 (docs/adr/):
+# - tudo local até a apresentação: T34, T11, T36 e M5 sem URL pública;
+# - telas de configuração de e-mail e WhatsApp: novas T42 e T43;
+# - LGPD acadêmica: T03, T35, T36, T37 e nova T44;
+# - Groq + Gemini em round robin e Meta Cloud API: T19, T21, T25;
+# - texto do TCC entregue até 25/11/2026: T39 sai de M6 para M5 e não espera T38.
 
 marcos:
   - id: M0
@@ -47,13 +54,13 @@ marcos:
     nome: Estabilização
     inicio: 2026-11-22
     fim: 2026-11-25
-    pronto_quando: "URL pública estável; relatório de testes; docs refletem o código; tag v1.0"
+    pronto_quando: "Sistema completo sobe localmente em containers; relatório de testes; docs refletem o código; tag v1.0; texto do TCC entregue ao orientador até 25/11/2026"
     capitulo_tcc: "Testes e resultados"
   - id: M6
     nome: TCC + defesa
     inicio: 2026-11-26
     fim: 2026-11-28
-    pronto_quando: "Texto aprovado pelo orientador até 25/11/2026; 2 ensaios feitos"
+    pronto_quando: "Correções do orientador incorporadas; 2 ensaios feitos"
     capitulo_tcc: "Conclusão"
   - id: BUF
     nome: Buffer
@@ -103,6 +110,7 @@ tasks:
     aceite:
       - "A migration roda do zero"
       - "O seed cria 1 admin, cerca de 20 alunos e 2 canais"
+      - "O seed usa apenas dados sintéticos"
     status: todo
     branch: null
     pr: null
@@ -207,7 +215,7 @@ tasks:
     depende: [T08]
     titulo: "Página com QR code do formulário"
     aceite:
-      - "PNG gerado a partir da URL pública"
+      - "PNG gerado a partir da URL do formulário no ambiente local"
     status: todo
     branch: null
     pr: null
@@ -262,6 +270,7 @@ tasks:
     aceite:
       - "E-mail real chega em conta de teste"
       - "Erro do provedor vira ok:false"
+      - "Funciona com remetente neutro enquanto os dados do TI da Fatec não chegam"
     status: todo
     branch: null
     pr: null
@@ -309,9 +318,9 @@ tasks:
     nivel: N1
     agente: integracao
     depende: [T05, T15]
-    titulo: "WhatsAppProvider + provedor escolhido + Mock"
+    titulo: "WhatsAppProvider + Meta Cloud API (número de teste) + Mock"
     aceite:
-      - "Mensagem chega a número de teste"
+      - "Mensagem chega a número de teste; se o envio real não ficar pronto, a limitação fica registrada e a demo usa o Mock"
       - "O Mock roda no CI"
     status: todo
     branch: null
@@ -335,11 +344,14 @@ tasks:
     nivel: IA
     agente: integracao
     depende: [T05, T14]
-    titulo: "LlmProvider + GeracaoIAService: prompt versionado, JSON com 2 versões, Zod, 1 retry, timeout"
+    titulo: "LlmProvider + GeracaoIAService com Groq e Gemini em round robin: prompt versionado, JSON com 2 versões, Zod, 1 retry, timeout"
     aceite:
       - "O exemplo \"Projeto Integrador até sexta 23h59\" gera 2 versões válidas"
       - "As versões geradas têm os placeholders corretos"
       - "Nenhum dado de aluno é enviado ao LLM"
+      - "As chamadas alternam entre Groq e Gemini, e o retry vai para o outro provedor"
+      - "Se os dois provedores falharem, a API devolve erro tratável para o fallback manual"
+      - "Os nomes dos modelos ficam em configuração, depois de testados com chaves reais"
     status: todo
     branch: null
     pr: null
@@ -390,6 +402,7 @@ tasks:
     aceite:
       - "O passo 1/2 cria o rascunho"
       - "O passo 1/2 chama /gerar"
+      - "A tela avisa que o prompt não deve conter dados pessoais"
     status: todo
     branch: null
     pr: null
@@ -499,11 +512,11 @@ tasks:
     nivel: N1
     agente: backend
     depende: [T28]
-    titulo: "Deploy (API, worker, front, DB), HTTPS, variáveis de ambiente, backup"
+    titulo: "Empacotar em containers locais (API, worker, front, DB), variáveis de ambiente, backup"
     aceite:
-      - "A URL pública está estável e com HTTPS"
-      - "O worker roda sem cair por 24h"
-      - "O backup está configurado"
+      - "Um único comando sobe o sistema completo na máquina do aluno"
+      - "O worker retoma os envios depois de reiniciar os containers"
+      - "O backup local foi criado e restaurado com sucesso"
     status: todo
     branch: null
     pr: null
@@ -513,12 +526,14 @@ tasks:
     nivel: N1
     agente: qa
     depende: [T34]
-    titulo: "Segurança e LGPD: rate limit, CORS, logs sem PII, política de privacidade, desativar aluno"
+    titulo: "Segurança e LGPD: rate limit, CORS, logs sem PII, política de privacidade, desativar e excluir aluno"
     aceite:
       - "Rate limit e CORS verificados"
       - "Logs verificados sem PII"
-      - "Política de privacidade publicada"
-      - "Desativação de aluno funciona"
+      - "Política de privacidade disponível no formulário"
+      - "Desativação de aluno funciona no admin"
+      - "Exclusão de aluno funciona no admin"
+      - "O formulário coleta só os campos necessários"
     status: todo
     branch: null
     pr: null
@@ -528,9 +543,10 @@ tasks:
     nivel: N1
     agente: qa
     depende: [T34]
-    titulo: "Teste com 2-3 docentes e 10+ alunos reais"
+    titulo: "Sessão de teste controlada e presencial, na mesma rede, com 2-3 docentes e 10+ alunos reais"
     aceite:
-      - "O teste foi feito com 2-3 docentes e 10+ alunos reais"
+      - "A sessão foi feita com 2-3 docentes e 10+ alunos reais"
+      - "Todos os participantes assinaram o termo de consentimento, anexado ao TCC"
       - "Há relatório com feedback e correções priorizadas"
     status: todo
     branch: null
@@ -544,7 +560,7 @@ tasks:
     titulo: "Correções, tag v1.0, seed de demo, vídeo de backup"
     aceite:
       - "A tag v1.0 foi criada"
-      - "O seed de demo funciona"
+      - "O seed de demo funciona e usa apenas dados sintéticos"
       - "O vídeo de backup foi gravado"
     status: todo
     branch: null
@@ -558,19 +574,24 @@ tasks:
     titulo: "Documentação técnica final: diagramas, manual de uso, README"
     aceite:
       - "Os diagramas refletem o código"
+      - "O caso de uso inclui Gerar com IA, Revisar versões, Cadastrar-se como aluno e Aprovar docente"
+      - "O vínculo entre Disparar e Processar Notificações foi revisto (extend ou include)"
+      - "O fluxograma deixa claro que a base acadêmica é a tabela alunos local"
       - "O manual de uso e o README refletem o código"
     status: todo
     branch: null
     pr: null
     concluida_em: null
   - id: T39
-    marco: M6
+    marco: M5
     nivel: N1
     agente: documentacao
-    depende: [T38]
-    titulo: "Texto final do TCC com anexos"
+    depende: [T05]
+    titulo: "Texto do TCC com anexos, escrito em paralelo e entregue para correção"
     aceite:
-      - "Versão aprovada pelo orientador até 25/11/2026"
+      - "Versão completa entregue ao orientador o quanto antes, no máximo até 25/11/2026"
+      - "O disclaimer da LGPD consta do texto"
+      - "As correções do orientador foram incorporadas antes da submissão"
     status: todo
     branch: null
     pr: null
@@ -593,10 +614,51 @@ tasks:
     marco: M6
     nivel: N1
     agente: documentacao
-    depende: [T39]
+    depende: [T38, T39]
     titulo: "Submissão e buffer"
     aceite:
       - "Entregue até 30/11/2026"
+    status: todo
+    branch: null
+    pr: null
+    concluida_em: null
+  - id: T42
+    marco: M3
+    nivel: N1
+    agente: backend
+    depende: [T07, T15, T19]
+    titulo: "API de configuração de e-mail e WhatsApp pelo admin (exige /mudanca-contrato)"
+    aceite:
+      - "Só o admin lê e altera a configuração"
+      - "Segredos ficam criptografados no banco, não voltam pela API e não aparecem em logs"
+      - "EmailCanal e WhatsAppCanal usam a configuração salva, com variáveis de ambiente como padrão"
+    status: todo
+    branch: null
+    pr: null
+    concluida_em: null
+  - id: T43
+    marco: M4
+    nivel: N1
+    agente: frontend
+    depende: [T10, T42]
+    titulo: "Telas de administração dos dados de e-mail e WhatsApp"
+    aceite:
+      - "O admin cadastra e altera os dados de disparo de e-mail"
+      - "O admin cadastra e altera os dados do WhatsApp"
+      - "Segredos salvos não são reexibidos"
+    status: todo
+    branch: null
+    pr: null
+    concluida_em: null
+  - id: T44
+    marco: ENT
+    nivel: N1
+    agente: documentacao
+    depende: [T36]
+    titulo: "Descarte dos dados reais de teste após a defesa"
+    aceite:
+      - "Os dados reais da sessão de teste foram excluídos, inclusive de backups"
+      - "O descarte está registrado, sem dados pessoais, com a data real da defesa"
     status: todo
     branch: null
     pr: null
