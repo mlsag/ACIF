@@ -8,12 +8,13 @@
 
 ## Contexto
 
-O sistema precisa de uma URL pública estável, com API, worker, front e PostgreSQL. Um plano gratuito pode hibernar processos, o que pararia o worker.
+O sistema precisa hospedar API, worker, front e PostgreSQL. A premissa inicial era uma URL pública estável, e um plano gratuito pode hibernar processos, o que pararia o worker. Essa premissa caiu com a decisão do orientador, registrada abaixo: não há URL pública até a apresentação.
 
 ## Opções
 
 1. **Infraestrutura da Fatec:** se existir; custo e acesso a confirmar.
 2. **Render, Railway ou Fly + Neon ou Supabase:** configuração rápida; limites dos planos gratuitos a verificar.
+3. **Container local até a apresentação:** sem custo, sem hibernação e com os dados só na máquina do aluno; sem acesso externo, e a demo depende dessa máquina.
 
 ## Decisão
 

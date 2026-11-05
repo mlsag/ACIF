@@ -1,7 +1,7 @@
 # ADR 0002: provedor de WhatsApp
 
 - **Status:** Aceito
-- **Data:** 03/11/2026
+- **Data:** 04/11/2026
 - **Prazo para decidir:** 05/11/2026 (original: 18/10/2026)
 - **Quem decide:** aluno, por delegação do orientador
 - **Tasks afetadas:** T19, T20, T42, T43
