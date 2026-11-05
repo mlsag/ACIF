@@ -1,6 +1,6 @@
 # ADR 0008: quem aprova docentes
 
-- **Status:** Proposto
+- **Status:** Aceito
 - **Data:** 03/11/2026
 - **Prazo para decidir:** 05/11/2026 (original: 25/10/2026)
 - **Quem decide:** orientador
@@ -18,12 +18,12 @@ Só usuários aprovados podem enviar comunicados. É preciso definir quem aprova
 
 ## Decisão
 
-Pendente. **Recomendação:** opção 1.
+**Decidido pelo orientador** ([resposta do orientador](../orientador/2026-11-03-resposta.md), registrada em 03/11/2026): o fluxo foi confirmado pela coordenação e será entregue assim. Entendido como a opção 1, a recomendada: flag simples de aprovação no N1. Outra forma de aprovar entra como mudança depois da banca.
 
-**Pergunta ao orientador:** quem deve ser o responsável pela aprovação?
+**Responsável (2ª resposta, registrada em 04/11/2026):** a aprovação de docentes passa pelo admin do sistema, que é a coordenação; quem administra a coordenação é a diretoria. No sistema, isso é o papel de administrador, sem criar novos papéis: múltiplos papéis são N3.
 
 ## Consequências
 
 - Usa `usuarios.status_aprovacao` e `usuarios.aprovado_por`.
 - Docente pendente não loga.
-- Um único admin é suficiente para o TCC, mas não reflete uma estrutura com vários responsáveis.
+- Um único papel de administrador atende à coordenação e à diretoria no TCC.

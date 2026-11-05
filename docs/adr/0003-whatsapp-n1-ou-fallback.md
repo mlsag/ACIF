@@ -1,6 +1,6 @@
 # ADR 0003: WhatsApp no N1 ou como fallback
 
-- **Status:** Proposto
+- **Status:** Aceito
 - **Data:** 03/11/2026
 - **Prazo para decidir:** 05/11/2026 (original: 18/10/2026)
 - **Quem decide:** orientador
@@ -18,9 +18,11 @@ O objetivo do TCC cita e-mail e WhatsApp, mas a entrega do WhatsApp depende de t
 
 ## Decisão
 
-Pendente. **Recomendação:** opção 1, com o e-mail como canal garantido.
+**Decidido pelo orientador** ([resposta do orientador](../orientador/2026-11-03-resposta.md), registrada em 03/11/2026): WhatsApp no N1, com 1 número para envio e ao menos 3 para teste, em sandbox/staging, usando os números dos envolvidos (aluno, orientador, Rafael e Coordenação). O e-mail segue como canal garantido.
 
-**Pergunta ao orientador:** o envio a 3–5 números de teste satisfaz o objetivo do trabalho? Se o template não for aprovado a tempo, a demonstração com Mock é aceitável?
+**Mock:** o orientador aceitou a demonstração com Mock se o WhatsApp real não ficar pronto; a correção fica para uma eventual ida à produção (2ª resposta, registrada em 04/11/2026).
+
+Os números de telefone nunca entram no Git; ficam só na configuração local.
 
 ## Consequências
 

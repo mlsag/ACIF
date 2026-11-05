@@ -34,7 +34,8 @@ Construir as telas do ACIF, fiéis a `docs/design/telas/` e ao design system em 
 ## Regras duras
 
 - **Nunca mostre número fictício.** Remova do protótipo "Taxa de Leitura 98%", "98.6% de confirmações" e "Taxa de Abertura ~98%". Taxa de leitura é N3.
-- Não fixe "GPT-4o Fatec" nem o remetente `@fatec.sp.gov.br`; eles dependem dos ADRs 0004 e 0006.
+- Não reproduza "GPT-4o Fatec" nem o remetente fixo `@fatec.sp.gov.br`; mostre o remetente configurado pelo admin (ADRs 0004 e 0006).
+- A tela de criação avisa que o prompt não deve conter dados pessoais.
 - Não implemente ações fora do backlog: Ajustar tom, Refinar Vocabulário, Visão do Aluno, recibo por e-mail e recuperação de senha.
 - Quando a IA falhar, a tela libera a escrita manual.
 - Placeholders só da whitelist: `{nome_aluno}`, `{curso}`, `{prazo}`, `{termo}`.

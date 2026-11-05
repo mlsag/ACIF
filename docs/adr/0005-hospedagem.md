@@ -1,10 +1,10 @@
 # ADR 0005: hospedagem
 
-- **Status:** Proposto
+- **Status:** Aceito
 - **Data:** 03/11/2026
 - **Prazo para decidir:** 05/11/2026 (original: 18/10/2026)
 - **Quem decide:** orientador
-- **Tasks afetadas:** T34
+- **Tasks afetadas:** T11, T34, T36
 
 ## Contexto
 
@@ -17,11 +17,11 @@ O sistema precisa de uma URL pública estável, com API, worker, front e Postgre
 
 ## Decisão
 
-Pendente. **Recomendação:** plano gratuito, com atenção à hibernação do worker, salvo se a Fatec oferecer infraestrutura.
-
-**Pergunta ao orientador:** a Fatec oferece infraestrutura para o projeto?
+**Decidido pelo orientador** ([resposta do orientador](../orientador/2026-11-03-resposta.md), registrada em 03/11/2026): tudo local, em container na máquina do aluno, até a apresentação. Produção está fora do escopo do TCC e seria outra decisão, com a coordenação, se a Fatec quiser adotar o sistema.
 
 ## Consequências
 
-- A T34 exige o worker ativo sem cair por 24h, o que testa a escolha.
-- Dados de alunos ficam num serviço terceiro se a infraestrutura for externa; isso se liga ao ADR 0009.
+- A T34 deixa de ter URL pública e HTTPS: entrega containers locais e backup.
+- Alunos não alcançam o formulário de fora da máquina, então a sessão de teste (T36) é presencial, na mesma rede.
+- A demo depende da máquina do aluno, o que reforça o vídeo de backup (R12 em [riscos.md](../riscos.md)).
+- Os dados de alunos ficam só nessa máquina (ver ADR 0009).

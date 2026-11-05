@@ -20,7 +20,7 @@ React → rotas (Zod, auth, rate limit) → services → repositories (Prisma) �
                                            └─ LlmProvider → provedor de LLM
 ```
 
-São dois processos com um único código: **API** e **worker de envio**. A fila é a tabela `envios`.
+São dois processos com um único código: **API** e **worker de envio**. A fila é a tabela `envios`. Tudo roda localmente em containers até a apresentação ([ADR 0005](docs/adr/0005-hospedagem.md)).
 
 ### Regras duras
 
@@ -28,7 +28,7 @@ São dois processos com um único código: **API** e **worker de envio**. A fila
 2. **Integrações só por porta:** `CanalEnvio` e `LlmProvider`.
 3. **LLM nunca recebe dado de aluno.** Só o texto do docente.
 4. **Placeholders só da whitelist:** `{nome_aluno}`, `{curso}`, `{prazo}`, `{termo}`.
-5. **Logs sem PII.** Sem consentimento, o aluno não é cadastrado.
+5. **Logs sem PII.** Sem consentimento, o aluno não é cadastrado. Dados sintéticos, exceto na sessão de teste controlada.
 6. **WhatsApp só por provedor oficial.** O Mock é obrigatório para CI e demo.
 7. **Nunca mostrar número fictício**, inclusive os que aparecem nos protótipos.
 8. **Sem over-engineering:** nada de microserviços, CQRS, DDD tático, Kubernetes ou Redis no N1.
@@ -57,7 +57,7 @@ Só por `/mudanca-contrato`. Vale para `schema.prisma`, `openapi.yaml` e as inte
 
 | Nível | Conteúdo | Regra |
 |---|---|---|
-| N1 | Login, aprovação de docente, cadastro público de aluno, rascunho, destinatários, e-mail e WhatsApp, status | Obrigatório |
+| N1 | Login, aprovação de docente, cadastro público de aluno, rascunho, destinatários, e-mail e WhatsApp, configuração pelo admin, status | Obrigatório |
 | IA | Geração das 2 versões, edição, reescrita | Núcleo, sempre com fallback manual |
 | N2 | QR code, histórico navegável, agendamento, busca, reenvio de falhas | Só se o marco estiver no prazo |
 | N3 | Dashboard, taxa de leitura, múltiplos papéis | Fora desta entrega |

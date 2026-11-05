@@ -1,10 +1,10 @@
 # ADR 0006: remetente do e-mail
 
-- **Status:** Proposto
+- **Status:** Aceito
 - **Data:** 03/11/2026
 - **Prazo para decidir:** 05/11/2026 (original: 18/10/2026)
 - **Quem decide:** orientador
-- **Tasks afetadas:** T08, T15
+- **Tasks afetadas:** T08, T15, T42, T43
 
 ## Contexto
 
@@ -17,9 +17,12 @@ O protótipo mostra `coordenacao.ads@fatec.sp.gov.br` como remetente, mas enviar
 
 ## Decisão
 
-Pendente. **Recomendação:** tentar a opção 1 se o acesso sair logo; caso contrário, opção 2.
+**Decidido pelo orientador** ([resposta do orientador](../orientador/2026-11-03-resposta.md), registrada em 03/11/2026):
+- Uma tela administrativa permite cadastrar os dados de disparo de e-mail.
+- O aluno solicita os dados ao Prof. Cristian, do TI da Fatec.
+- Se os dados demorarem, usa-se um remetente neutro como fallback.
 
-**Pergunta ao orientador:** quem administra o DNS de `fatec.sp.gov.br`? É viável configurar SPF/DKIM antes do M1 (06/11/2026)?
+**Nota técnica:** a tela guarda os dados de SMTP e de remetente. SPF e DKIM são configurados no DNS do domínio, não no sistema, e por isso continuam dependendo do TI.
 
 ## Consequências
 

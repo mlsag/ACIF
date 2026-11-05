@@ -1,6 +1,6 @@
 # ADR 0007: IA como núcleo com fallback
 
-- **Status:** Proposto
+- **Status:** Aceito
 - **Data:** 03/11/2026
 - **Prazo para decidir:** 05/11/2026 (original: 18/10/2026)
 - **Quem decide:** orientador
@@ -18,9 +18,9 @@ As telas colocam a geração por IA no centro do fluxo, mas o `mvp tcc.odt` defi
 
 ## Decisão
 
-Pendente. **Recomendação:** aceitar a opção 1.
+**Decidido pelo orientador** ([resposta do orientador](../orientador/2026-11-03-resposta.md), registrada em 03/11/2026): a IA é usada sempre com revisão humana e opção de escrita manual.
 
-**Pergunta ao orientador:** a IA generativa como parte central do trabalho está de acordo com a proposta do TCC?
+A resposta tratou "central" como depender de uma única IA e pede múltiplas IAs gratuitas, o que está resolvido no [ADR 0004](0004-provedor-llm.md). A pergunta original, sobre a IA como parte central do trabalho, foi entendida como respondida de forma implícita.
 
 ## Consequências
 

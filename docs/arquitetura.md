@@ -1,6 +1,6 @@
 # Arquitetura do ACIF
 
-> A stack e o padrão arquitetural estão **assumidos**, não aprovados. Valem como proposta até o orientador decidir o [ADR 0001](adr/0001-padrao-arquitetural-e-stack.md).
+> O padrão arquitetural e a stack foram aprovados no [ADR 0001](adr/0001-padrao-arquitetural-e-stack.md).
 
 ## 1. Visão geral
 
@@ -10,20 +10,20 @@ O ACIF centraliza o envio de comunicados da Fatec Garça. O docente ou admin cad
 
 Fora de cogitação no N1: microserviços, CQRS, DDD tático, Kubernetes e Redis.
 
-## 2. Stack proposta
+## 2. Stack
 
 | Camada | Escolha |
 |---|---|
-| Backend | Node + TypeScript + Fastify + Zod (versão do Node no ADR 0001) |
+| Backend | Node LTS + TypeScript + Fastify + Zod |
 | Banco | PostgreSQL + Prisma (migrations) |
 | Frontend | React + Vite + Tailwind + TanStack Query; cliente tipado gerado do `openapi.yaml`; mocks com MSW |
 | Fila | A própria tabela `envios`, com worker usando `SELECT … FOR UPDATE SKIP LOCKED`, concorrência limitada e retry com backoff |
 | E-mail | Nodemailer + provedor transacional (Brevo, Resend ou SendGrid) |
-| WhatsApp | `WhatsAppProvider`: Meta Cloud API, Twilio ou Mock (o Mock é obrigatório para CI e demo) |
-| LLM | `LlmProvider` com saída JSON validada por Zod |
+| WhatsApp | `WhatsAppProvider`: Meta Cloud API com número de teste ou Mock (o Mock é obrigatório para CI e demo) |
+| LLM | `LlmProvider` com saída JSON validada por Zod; Groq + Gemini em round robin |
 | Auth | JWT em cookie httpOnly + argon2/bcrypt |
 | Testes e CI | Vitest + Supertest, 1 E2E com Playwright, GitHub Actions |
-| Hospedagem | Render, Railway ou Fly + Postgres gerenciado (Neon ou Supabase) |
+| Hospedagem | Tudo local, em container na máquina do aluno, até a apresentação ([ADR 0005](adr/0005-hospedagem.md)) |
 
 ## 3. Camadas e componentes
 
@@ -237,11 +237,13 @@ classDiagram
     EnvioService --> RegistryCanais
 ```
 
-`ProvedorOficial` é a Meta Cloud API ou a Twilio, conforme o [ADR 0002](adr/0002-provedor-whatsapp.md).
+`ProvedorOficial` é a Meta Cloud API, conforme o [ADR 0002](adr/0002-provedor-whatsapp.md).
+
+**Configuração pelo admin:** telas administrativas permitem ajustar os dados de e-mail e WhatsApp, com segredos criptografados no banco e variáveis de ambiente como padrão (T42 e T43; ADRs 0002 e 0006). A estrutura de dados será definida por `/mudanca-contrato` na T42.
 
 ### LlmProvider
 
-Recebe **somente** o texto do docente e o prompt de sistema versionado em `/prompts`. Devolve um JSON validado por Zod. O provedor será definido no [ADR 0004](adr/0004-provedor-llm.md).
+Recebe **somente** o texto do docente e o prompt de sistema versionado em `/prompts`. Devolve um JSON validado por Zod. Conforme o [ADR 0004](adr/0004-provedor-llm.md), Groq e Gemini, nos planos gratuitos, alternam em round robin. Se os dois falharem, vale o fallback manual.
 
 ## 6. Fluxo da IA
 
@@ -332,11 +334,14 @@ sequenceDiagram
 ## 8. LGPD (inegociável)
 
 - O LLM recebe **somente** o texto do docente. Nenhum dado de aluno sai do backend para ele.
+- A tela de criação avisa que o prompt não deve conter dados pessoais, porque planos gratuitos podem usar o conteúdo enviado ([ADR 0004](adr/0004-provedor-llm.md)).
 - Logs não contêm PII.
 - Sem consentimento, o aluno não é cadastrado.
 - O aluno pode ser desativado.
 
-Exigências de retenção e descadastro estão pendentes no [ADR 0009](adr/0009-lgpd.md).
+O enquadramento acadêmico aprovado está no [ADR 0009](adr/0009-lgpd.md): dados sintéticos no desenvolvimento e na demo, dado real só na sessão de teste controlada, termo de consentimento, minimização de campos, desativação e exclusão de aluno no admin e descarte dos dados de teste após a defesa.
+
+> Este enquadramento vale para o protótipo acadêmico local. Caso a ferramenta seja adotada em produção, a LGPD deve ser debatida com a coordenação, a diretoria e o TI, todos juntos, antes de qualquer uso real.
 
 ## 9. WhatsApp oficial
 
@@ -349,9 +354,10 @@ Os protótipos orientam o visual, mas não ampliam o escopo.
 | Elemento do protótipo | Tratamento |
 |---|---|
 | "Taxa de Leitura 98%", "98.6% de confirmações", "Taxa de Abertura ~98%" | Não reproduzir. Taxa de leitura é N3 e a demo nunca mostra número fictício |
-| "GPT-4o Fatec" | Não vira fato; depende do ADR 0004 |
-| Remetente `@fatec.sp.gov.br` | Não vira fato; depende do ADR 0006 |
-| Ajustar tom, Refinar Vocabulário, Visão do Aluno, recibo por e-mail, recuperação de senha | Fora do backlog; só entram por ADR |
+| "GPT-4o Fatec" | Não reproduzir; os provedores são os do ADR 0004 |
+| Remetente `@fatec.sp.gov.br` | Mostrar o remetente real configurado pelo admin (ADR 0006) |
+| Ajustar tom, Refinar Vocabulário, Visão do Aluno, recuperação de senha | Fora do backlog; só entram por ADR |
+| Recibo por e-mail ("cópia para o docente") | N3, segundo `RESPOSTA 1.odt`; fora desta entrega |
 | Cancelar (fluxograma) | Sai da tela sem disparar e mantém o rascunho |
 
 ## 11. Origem dos artefatos
