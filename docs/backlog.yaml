@@ -136,10 +136,10 @@ tasks:
     titulo: "Levar ADRs 0001-0009 ao orientador e registrar o resultado"
     aceite:
       - "ADRs 0001-0009 têm status Aceito ou Rejeitado"
-    status: in_progress
+    status: done
     branch: task/T05-adrs-orientador
-    pr: null
-    concluida_em: null
+    pr: 5
+    concluida_em: 2026-11-10
   - id: T06
     marco: M1
     nivel: N1
