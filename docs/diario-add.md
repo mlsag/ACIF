@@ -20,7 +20,7 @@ Cada task fechada com `/fechar-task` gera uma entrada neste formato:
 
 Não é uma task do backlog. Preparou o repositório para o fluxo ADD.
 
-- **PR:** [VERIFICAR] (ainda não aberto)
+- **PR:** #4 (mergeado em 04/11/2026)
 - **O que a IA gerou:** documentação de arquitetura, roadmap, riscos, ADRs Propostos, backlog, subagentes, skills e template de PR.
 - **O que o aluno decidiu, corrigiu ou rejeitou:**
   - Definiu o escopo, a arquitetura e o backlog inicial no prompt de bootstrap.
