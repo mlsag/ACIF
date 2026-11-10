@@ -72,3 +72,29 @@ Não é uma task do backlog. Preparou o repositório para o fluxo ADD.
 - **Lições:**
   - Rodar as ferramentas em container evitou instalar Node na máquina do aluno.
   - Verificar a versão LTS em vez de presumi-la mudou a escolha do Node 20, previsto no plano original, para o 26.
+
+## T03 — Schema Prisma, migration e seed (10/11/2026)
+
+- **PR:** #9 (aberto; o merge é do aluno). CI verde no run 42863300892, jobs `checks` e `compose`, commit 4a5380f. O primeiro run do PR (42858251176, commit f3b09a4) falhou no job `compose`.
+- **O que a IA gerou:**
+  - O agente `backend` propôs o plano e verificou em container que o Prisma 7.10.1 e o argon2 0.45.2 funcionam no Node 26.
+  - O mesmo agente apontou lacunas do ER sem decidi-las sozinho: status e papel, datas, obrigatoriedade de campos em `alunos`, `jsonb`, telefone e unicidade de `canais.nome`.
+  - Implementou as 6 tabelas, a migration inicial e o seed idempotente, com 1 admin com senha argon2id, 20 alunos sintéticos com e-mails `@example.com` e 2 canais.
+  - Criou o serviço `migrate` no docker-compose, o banco de teste no CI e testes por critério de aceite.
+  - O agente `arquiteto` deu parecer, via `/mudanca-contrato`, aprovando a chave única em `canais.nome`, sem ADR.
+  - O agente `qa` revisou com evidências.
+  - Desvios aceitos pelo aluno: `migrate deploy` em vez de `reset` nos testes; geração automática do cliente Prisma antes de typecheck, testes e build; aviso de atualização do Prisma desligado, porque sugeria uma versão RC.
+  - Erro da IA corrigido na revisão do plano: o agente afirmou que os comandos do `CLAUDE.md` estavam em TODO, mas eles já estavam preenchidos desde a T01.
+  - Falha encontrada no CI e corrigida: o serviço `migrate` rodava com UID 1000, mas no runner do GitHub a pasta tem outro dono, o que gerava `EACCES` ao gravar o cliente Prisma. A falha foi reproduzida localmente com outro UID e corrigida passando `ACIF_UID` e `ACIF_GID` do runner no job `compose`.
+- **O que o aluno decidiu, corrigiu ou rejeitou:**
+  - Aceitou o pacote de preenchimento das lacunas do ER.
+  - Aprovou a mudança de contrato que torna `canais.nome` único.
+  - Escolheu o seed automático, desligável com `SEED_AUTO=false`.
+  - Escolheu manter o `/health` sem mudança.
+  - Abriu o PR #9.
+  - Autorizou a correção do CI.
+  - Nada foi rejeitado, segundo o aluno.
+- **Prompts relevantes:** nenhum além dos comandos do fluxo (`/executar-task`, `/mudanca-contrato`, `/revisar-task`, `/fechar-task`) e das respostas às perguntas de decisão.
+- **Lições:**
+  - Verificar a versão do Prisma em vez de usar a tag `latest` evitou adotar uma versão RC.
+  - O CI pegou uma falha de permissão que o ambiente local não mostrava; reproduzi-la com outro UID confirmou a causa antes da correção.
