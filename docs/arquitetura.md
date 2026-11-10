@@ -97,7 +97,7 @@ docker/     Dockerfile.dev (imagem única de desenvolvimento)
 
 - **npm workspaces** na raiz (`backend`, `frontend`): um lockfile, um `npm ci` e um lint compartilhado. Sem nx ou turborepo.
 - **Versões:** Node 26 (LTS ativa em 10/11/2026, fixada em `.nvmrc`) e PostgreSQL 18. As dependências ficam fixadas no `package-lock.json`.
-- **`docker-compose.yml`:** quatro serviços. As portas são publicadas só em 127.0.0.1. O compose sobe sem `.env`, porque os padrões são só de desenvolvimento.
+- **`docker-compose.yml`:** quatro serviços de longa duração e o `migrate` (T03), que roda uma vez. As portas são publicadas só em 127.0.0.1. O compose sobe sem `.env`, porque os padrões são só de desenvolvimento.
 
   | Serviço | Porta | Healthcheck |
   |---|---|---|
@@ -105,10 +105,11 @@ docker/     Dockerfile.dev (imagem única de desenvolvimento)
   | `api` | 3333 | `GET /health` |
   | `worker` | sem porta | sem healthcheck; `restart: unless-stopped` |
   | `web` | 5173 | `GET /` |
+  | `migrate` (T03) | sem porta | roda uma vez: `prisma generate`, `migrate deploy` e seed (`SEED_AUTO=false` pula o seed); `api` e `worker` esperam ele terminar com sucesso |
 
 - **CI** (`.github/workflows/ci.yml`), sem segredos e com dois jobs:
-  - `checks`: lint, typecheck, testes e build.
-  - `compose`: sobe o compose e confere o `/health`, a página e o heartbeat do worker.
+  - `checks`: lint, typecheck, testes e build, com um serviço PostgreSQL só para os testes de integração (banco `acif_test`, desde a T03).
+  - `compose`: sobe o compose e confere o `/health`, a página e o heartbeat do worker; desde a T03, também o `migrate` e as contagens do seed.
 - As imagens de produção, o backup e a retomada do worker ficam para a T34.
 
 ## 4. Modelo de dados
@@ -176,7 +177,7 @@ erDiagram
     }
     canais {
         int id PK
-        varchar nome
+        varchar nome UK "chave do registry de CanalEnvio"
         boolean ativo
     }
     envios {
@@ -196,6 +197,7 @@ erDiagram
 **Restrições**
 
 - `alunos`: chave única em `ra` e em `email`.
+- `canais`: chave única em `nome`, que é a chave do registry de `CanalEnvio` e do upsert do seed.
 - `comunicado_versoes`: chave única em (`id_comunicado`, `id_canal`).
 - `envios`: chave única em (`id_comunicado`, `id_aluno`, `id_canal`), que garante a idempotência do disparo.
 - Status de `comunicados`: `rascunho`, `pronto`, `enviando`, `concluido`, `agendado` (N2).
@@ -209,6 +211,24 @@ erDiagram
 | `titulo` e `conteudo` obrigatórios | Opcionais em `rascunho` e exigidos no disparo | A tela 03 não os coleta. `titulo` vem do assunto do e-mail ou, sem e-mail, do início do prompt |
 | Sem canais no comunicado | `comunicados.canais` (jsonb) | O rascunho guarda os canais escolhidos antes de existir qualquer versão (T12) |
 | Classe `Destinatario` (entidade do `mvp tcc.odt`) | Tabela `envios` | Cada linha é um destinatário em um canal |
+| `canais.nome` sem restrição | Chave única | O registry de `CanalEnvio` e o seed localizam o canal pelo nome; evita canal duplicado e protege a idempotência de `envios` (`/mudanca-contrato` aprovada em 10/11/2026, T03) |
+
+**Preenchimentos do ER na implementação (T03, aprovados pelo aluno em 10/11/2026)**
+
+O ER não define estes pontos. Eles foram fixados no `backend/prisma/schema.prisma` sem alterar nada do que está acima.
+
+| Ponto | Decisão |
+|---|---|
+| Status e papel | `varchar`, sem enum nem `CHECK` no banco. Os valores aceitos ficam em constantes `as const` (`backend/src/dominio/valores.ts`) e são validados no código. `papel`: `admin` ou `docente`. |
+| Datas | `timestamptz(3)` (`@db.Timestamptz(3)`); `data_cadastro` e `data_criacao` com padrão `now()` |
+| `usuarios.aprovado_por` | Mantém o nome do ER (exceção ao padrão `id_<tabela>`); FK opcional para `usuarios.id` |
+| `alunos` | Obrigatórios: `ra` (único), `nome`, `email` (único), `curso`, `periodo`, `termo` e `consentimento_lgpd_em`. Opcionais: `telefone`, `turma` e `email_confirmado_em` |
+| jsonb de `comunicados` | `canais` obrigatório com padrão `[]`; `variaveis` e `filtro_destinatarios` opcionais |
+| Opcionais e padrões | `ativo` com padrão `true`; `status_aprovacao` com padrão `pendente`; `comunicados.status` com padrão `rascunho`; `envios.status` com padrão `pendente`; `tentativas` com padrão `0`; `editado` com padrão `false`; `comunicado_versoes.assunto` opcional (o WhatsApp não tem assunto); `data_envio`, `proxima_tentativa`, `mensagem_erro`, `id_externo`, `prompt_original` e `data_agendada` opcionais |
+| Tamanhos de varchar | `nome` 120; `email` 254; `senha` 255 (guarda o hash argon2id); `papel` e status 20; `ra`, `telefone`, `turma`, `periodo` e `termo` 20; `curso` 120; `titulo` e `assunto` 200; `origem` 10; `canais.nome` 30; `id_externo` 255 |
+| Chaves estrangeiras | `ON DELETE RESTRICT` em todas. A exclusão de aluno com histórico de envios fica para a T35 |
+| Nomes no Prisma | Model no singular com `@@map` para a tabela (`Usuario` → `usuarios`); campos em snake_case, iguais às colunas |
+| Seed | Só dados sintéticos: alunos `Aluno Sintético NN`, e-mails `@example.com` (domínio reservado, RFC 2606), RA `SINTnnnn` e telefone nulo, porque não há faixa de telefone reservada (regra 7). Admin em `SEED_ADMIN_EMAIL` e `SEED_ADMIN_SENHA`, com padrão só de desenvolvimento |
 
 **Destinatários:** o filtro aceita curso, período, turma, termo ou aluno individual. Filtro vazio significa todos os alunos ativos, opção que aparece no fluxograma e no painel. A tela sempre mostra a prévia de contagem antes do disparo.
 

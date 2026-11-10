@@ -1,0 +1,132 @@
+// Schema do ACIF: contrato. Mudanças só por /mudanca-contrato.
+// Fonte: docs/arquitetura.md, seção 4 (ER, restrições e decisões de modelagem).
+// Convenção: model no singular com @@map para a tabela; campos em snake_case, iguais às colunas.
+// Status e papel são varchar validados no código (backend/src/dominio/valores.ts).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Usuario {
+  id               Int      @id @default(autoincrement())
+  nome             String   @db.VarChar(120)
+  email            String   @unique @db.VarChar(254)
+  /// Hash argon2id; nunca a senha em texto.
+  senha            String   @db.VarChar(255)
+  ativo            Boolean  @default(true)
+  data_cadastro    DateTime @default(now()) @db.Timestamptz(3)
+  /// admin | docente
+  papel            String   @db.VarChar(20)
+  /// pendente | aprovado | bloqueado
+  status_aprovacao String   @default("pendente") @db.VarChar(20)
+  aprovado_por     Int?
+
+  aprovador   Usuario?     @relation("AprovacaoUsuario", fields: [aprovado_por], references: [id], onDelete: Restrict)
+  aprovados   Usuario[]    @relation("AprovacaoUsuario")
+  comunicados Comunicado[]
+
+  @@map("usuarios")
+}
+
+model Aluno {
+  id                    Int       @id @default(autoincrement())
+  ra                    String    @unique @db.VarChar(20)
+  nome                  String    @db.VarChar(120)
+  email                 String    @unique @db.VarChar(254)
+  telefone              String?   @db.VarChar(20)
+  curso                 String    @db.VarChar(120)
+  turma                 String?   @db.VarChar(20)
+  periodo               String    @db.VarChar(20)
+  termo                 String    @db.VarChar(20)
+  ativo                 Boolean   @default(true)
+  data_cadastro         DateTime  @default(now()) @db.Timestamptz(3)
+  consentimento_lgpd_em DateTime  @db.Timestamptz(3)
+  email_confirmado_em   DateTime? @db.Timestamptz(3)
+
+  envios Envio[]
+
+  @@map("alunos")
+}
+
+model Comunicado {
+  id                   Int       @id @default(autoincrement())
+  id_usuario           Int
+  /// Opcional em rascunho; exigido no disparo.
+  titulo               String?   @db.VarChar(200)
+  /// Opcional em rascunho; exigido no disparo.
+  conteudo             String?
+  data_criacao         DateTime  @default(now()) @db.Timestamptz(3)
+  data_envio           DateTime? @db.Timestamptz(3)
+  /// rascunho | pronto | enviando | concluido | agendado (N2)
+  status               String    @default("rascunho") @db.VarChar(20)
+  prompt_original      String?
+  variaveis            Json?
+  filtro_destinatarios Json?
+  /// Canais escolhidos no rascunho, antes de existir versão (T12).
+  canais               Json      @default("[]")
+  /// N2
+  data_agendada        DateTime? @db.Timestamptz(3)
+
+  usuario Usuario            @relation(fields: [id_usuario], references: [id], onDelete: Restrict)
+  versoes ComunicadoVersao[]
+  envios  Envio[]
+
+  @@map("comunicados")
+}
+
+model ComunicadoVersao {
+  id             Int     @id @default(autoincrement())
+  id_comunicado  Int
+  id_canal       Int
+  /// Nulo no WhatsApp, que não tem assunto.
+  assunto        String? @db.VarChar(200)
+  corpo_template String
+  /// ia | manual
+  origem         String  @db.VarChar(10)
+  editado        Boolean @default(false)
+
+  comunicado Comunicado @relation(fields: [id_comunicado], references: [id], onDelete: Restrict)
+  canal      Canal      @relation(fields: [id_canal], references: [id], onDelete: Restrict)
+
+  @@unique([id_comunicado, id_canal])
+  @@map("comunicado_versoes")
+}
+
+model Canal {
+  id    Int     @id @default(autoincrement())
+  /// Chave do registry de CanalEnvio.
+  nome  String  @unique @db.VarChar(30)
+  ativo Boolean @default(true)
+
+  versoes ComunicadoVersao[]
+  envios  Envio[]
+
+  @@map("canais")
+}
+
+model Envio {
+  id                Int       @id @default(autoincrement())
+  id_comunicado     Int
+  id_aluno          Int
+  id_canal          Int
+  data_envio        DateTime? @db.Timestamptz(3)
+  /// pendente | enviado | falha
+  status            String    @default("pendente") @db.VarChar(20)
+  mensagem_erro     String?
+  tentativas        Int       @default(0)
+  proxima_tentativa DateTime? @db.Timestamptz(3)
+  id_externo        String?   @db.VarChar(255)
+
+  comunicado Comunicado @relation(fields: [id_comunicado], references: [id], onDelete: Restrict)
+  aluno      Aluno      @relation(fields: [id_aluno], references: [id], onDelete: Restrict)
+  canal      Canal      @relation(fields: [id_canal], references: [id], onDelete: Restrict)
+
+  /// Idempotência do disparo.
+  @@unique([id_comunicado, id_aluno, id_canal])
+  @@map("envios")
+}

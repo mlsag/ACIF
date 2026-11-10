@@ -29,11 +29,38 @@ services:
     volumes:
       # PostgreSQL 18+: o volume é montado em /var/lib/postgresql (não em .../data)
       - pgdata:/var/lib/postgresql
+      # Cria o banco acif_test (testes de integração) na primeira inicialização do volume
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Roda uma vez e termina: gera o cliente Prisma, aplica as migrations e, se SEED_AUTO não for false,
+  # roda o seed (só dados sintéticos, pode rodar de novo sem duplicar). api e worker esperam ele terminar.
+  # Roda com o uid/gid do host para que o cliente gerado (backend/src/generated) não fique com dono root.
+  migrate:
+    <<: *node
+    user: '${ACIF_UID:-1000}:${ACIF_GID:-1000}'
+    command:
+      - sh
+      - -c
+      - >-
+        npm run db:generate -w backend &&
+        npm run db:deploy -w backend &&
+        if [ "$${SEED_AUTO}" = "false" ]; then echo '{"evento":"seed_pulado"}'; else npm run db:seed -w backend; fi
+    environment:
+      <<: *db-env
+      HOME: /tmp
+      # O aviso de atualização do Prisma sugere a tag latest (hoje um RC 8.x); a versão é fixada em 7.10.1
+      PRISMA_HIDE_UPDATE_MESSAGE: '1'
+      SEED_AUTO: ${SEED_AUTO:-true}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_SENHA: ${SEED_ADMIN_SENHA:-}
+    depends_on:
+      db:
+        condition: service_healthy
 
   api:
     <<: *node
@@ -47,6 +74,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -70,6 +99,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
     <<: *node

@@ -16,6 +16,23 @@ jobs:
   checks:
     name: Lint, typecheck, testes e build
     runs-on: ubuntu-latest
+    # Banco só para os testes de integração (migration do zero e seed); credenciais de CI, sem segredo.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: acif
+          POSTGRES_PASSWORD: acif_ci
+          POSTGRES_DB: acif_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U acif -d acif_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://acif:acif_ci@localhost:5432/acif_test
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -33,9 +50,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Usuário do runner para o serviço migrate
+        # O migrate grava o cliente Prisma no código montado; precisa do mesmo dono da pasta
+        run: |
+          echo "ACIF_UID=$(id -u)" >> "$GITHUB_ENV"
+          echo "ACIF_GID=$(id -g)" >> "$GITHUB_ENV"
       - run: docker compose config -q
       - run: docker compose up -d --build --wait --wait-timeout 180
       - run: docker compose ps
+      - name: Migration e seed (serviço migrate)
+        run: |
+          test "$(docker compose ps -a migrate --format '{{.ExitCode}}')" = "0"
+          docker compose logs migrate
+      - name: Contagens do seed (1 admin, 20 alunos, 2 canais)
+        run: |
+          contar() { docker compose exec -T db psql -U acif -d acif -tAc "$1"; }
+          test "$(contar "select count(*) from usuarios where papel = 'admin'")" = "1"
+          test "$(contar "select count(*) from alunos")" = "20"
+          test "$(contar "select count(*) from canais")" = "2"
+          test "$(contar "select count(*) from alunos where email not like '%@example.com'")" = "0"
       - run: curl -fsS http://127.0.0.1:3333/health
       - run: curl -fsS http://127.0.0.1:5173/ | grep -i '<title>ACIF</title>'
       - name: Worker emitiu heartbeat

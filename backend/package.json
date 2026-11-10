@@ -7,16 +7,28 @@
     "worker:dev": "tsx watch src/worker.ts",
     "start": "node dist/server.js",
     "worker": "node dist/worker.js",
+    "prebuild": "prisma generate",
     "build": "tsc -p tsconfig.build.json",
+    "pretypecheck": "prisma generate",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "pretest": "prisma generate",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:status": "prisma migrate status"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "argon2": "0.45.2",
     "fastify": "5.12.8"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
     "@types/supertest": "7.2.1",
+    "prisma": "7.10.1",
     "supertest": "7.3.2",
     "tsx": "4.23.15",
     "vitest": "5.1.0"
