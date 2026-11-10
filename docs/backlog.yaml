@@ -230,8 +230,8 @@ tasks:
     aceite:
       - "O CRUD é validado"
       - "Cada docente acessa só os seus comunicados"
-    status: todo
-    branch: null
+    status: in_progress
+    branch: task/T12-comunicados
     pr: null
     concluida_em: null
   - id: T13
