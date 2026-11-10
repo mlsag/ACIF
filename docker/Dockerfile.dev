@@ -1,0 +1,12 @@
+# Imagem de desenvolvimento única para api, worker e web (cada serviço muda só o command).
+# Imagens de produção ficam para a T34.
+FROM node:26-slim
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY backend/package.json backend/
+COPY frontend/package.json frontend/
+RUN npm ci --no-audit --no-fund
+
+COPY . .

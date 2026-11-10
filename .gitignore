@@ -1,0 +1,15 @@
+# Dependências e builds
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Segredos: nunca commitar .env (só o .env.example)
+.env
+.env.*
+!.env.example
+
+# Logs e sistema
+*.log
+.DS_Store

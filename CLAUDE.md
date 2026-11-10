@@ -92,13 +92,30 @@ Só por `/mudanca-contrato`. Vale para `schema.prisma`, `openapi.yaml` e as inte
 
 ## Comandos do projeto
 
-<!-- TODO(T01): substituir pelos comandos reais quando a T01 criá-los. -->
 
-```
-TODO: subir ambiente
-TODO: lint
-TODO: testes
-TODO: migrations e seed
+Não há Node instalado na máquina: o npm roda dentro do container `node:26-slim`, e todo comando Docker usa o contexto `default` por variável. Não rode `docker context use` nem altere `~/.docker`.
+
+```bash
+export DOCKER_CONTEXT=default            # em cada shell (o contexto ativo, desktop-linux, pode estar parado)
+alias dnpm='docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app -w /app node:26-slim npm'
+
+# Subir e derrubar o ambiente (db, api :3333, worker, web :5173; .env é opcional, ver .env.example)
+docker compose up -d --build --wait
+docker compose down -v                   # -v apaga o banco local
+docker compose up -d --build --wait -V   # após mudar dependências (recria os volumes de node_modules)
+
+# Dependências, lint, tipos, testes e build (o mesmo que o CI roda)
+dnpm ci
+dnpm run lint                            # ESLint + Prettier --check
+dnpm run format                          # corrige a formatação
+dnpm run typecheck
+dnpm test
+dnpm run build
+
+# Validar o workflow do CI
+docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest
+
+TODO (T03): migrations e seed
 ```
 
 ## Documentação
