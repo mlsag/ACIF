@@ -98,3 +98,25 @@ Não é uma task do backlog. Preparou o repositório para o fluxo ADD.
 - **Lições:**
   - Verificar a versão do Prisma em vez de usar a tag `latest` evitou adotar uma versão RC.
   - O CI pegou uma falha de permissão que o ambiente local não mostrava; reproduzi-la com outro UID confirmou a causa antes da correção.
+
+## T06 — Auth: login, hash, JWT httpOnly, middleware e logout (10/11/2026)
+
+- **PR:** #11 (mergeado em 10/11/2026). CI verde no run 42874449069, incluindo o passo "Auth de ponta a ponta (T06)" no job `compose`, commit 326bfdf.
+- **Desvio do fluxo:** o PR #11 foi mergeado antes do `/revisar-task`. A revisão do agente `qa` aprovou a task depois, sem correções, então não houve impacto; o fluxo prevê o merge só depois da revisão.
+- **O que a IA gerou:**
+  - O agente `backend` propôs o plano e verificou no container as versões de `@fastify/cookie`, `@fastify/jwt`, `@fastify/rate-limit` e `zod`.
+  - Implementou `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` e o hook de autenticação reutilizável, em camadas `rota → AuthService → UsuarioRepository`.
+  - Escreveu 45 testes de auth e testes com o banco real.
+  - Acrescentou por conta própria: token aceito só pelo cookie, não pelo cabeçalho `Authorization`; handler global de erros que padroniza 400, 429 e 500 sem vazar detalhes.
+  - O agente `qa` revisou com evidências nos testes e no compose real.
+- **O que o aluno decidiu, corrigiu ou rejeitou:**
+  - Escolheu sessão de 8h com checagem no banco a cada requisição.
+  - Escolheu o proxy do Vite, sem CORS, para a T10.
+  - Escolheu 400 para corpo malformado e 401 genérico para falha de credencial.
+  - Escolheu o teste de ponta a ponta no CI.
+  - Abriu e mergeou o PR #11.
+  - Nada foi rejeitado, segundo o aluno.
+- **Prompts relevantes:** nenhum além dos comandos do fluxo (`/executar-task`, `/revisar-task`, `/fechar-task`) e das respostas às perguntas de decisão.
+- **Lições:**
+  - A revisão encontrou um efeito colateral da decisão do proxy do Vite: o rate limit do login passaria a ser compartilhado por todos os usuários. Virou o risco R15, a tratar na T10.
+  - Fazer o merge antes da revisão funcionou desta vez, mas tira da revisão o poder de barrar a entrada de um problema na `main`.

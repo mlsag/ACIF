@@ -150,10 +150,10 @@ tasks:
     aceite:
       - "Credencial inválida dá 401 genérico"
       - "Rota protegida bloqueia sem sessão"
-    status: in_progress
+    status: done
     branch: task/T06-auth
-    pr: null
-    concluida_em: null
+    pr: 11
+    concluida_em: 2026-11-10
   - id: T07
     marco: M1
     nivel: N1
