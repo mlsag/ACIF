@@ -113,7 +113,7 @@ tasks:
       - "O seed usa apenas dados sintéticos"
     status: in_progress
     branch: task/T03-schema-prisma
-    pr: null
+    pr: 9
     concluida_em: null
   - id: T04
     marco: M0

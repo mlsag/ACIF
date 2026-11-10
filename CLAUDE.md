@@ -117,6 +117,8 @@ docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest
 
 # Migrations e seed (Prisma 7.10.1 fixado; não use a tag latest, que hoje é um RC 8.x)
 # O `up` já roda o serviço migrate: generate + migrate deploy + seed (SEED_AUTO=false pula o seed)
+# O migrate roda com ACIF_UID/ACIF_GID (padrão 1000) e precisa ser o dono da pasta: se seu uid for outro, defina-os no .env
+# Trocar SEED_ADMIN_EMAIL com o banco já criado gera um segundo admin; nesse caso, recrie com down -v
 docker compose run --rm migrate npm run db:seed -w backend      # seed de novo (sem duplicar)
 docker compose run --rm migrate npm run db:status -w backend    # estado das migrations
 docker compose logs migrate
