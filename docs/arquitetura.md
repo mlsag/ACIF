@@ -109,8 +109,28 @@ docker/     Dockerfile.dev (imagem única de desenvolvimento)
 
 - **CI** (`.github/workflows/ci.yml`), sem segredos e com dois jobs:
   - `checks`: lint, typecheck, testes e build, com um serviço PostgreSQL só para os testes de integração (banco `acif_test`, desde a T03).
-  - `compose`: sobe o compose e confere o `/health`, a página e o heartbeat do worker; desde a T03, também o `migrate` e as contagens do seed.
+  - `compose`: sobe o compose e confere o `/health`, a página e o heartbeat do worker; desde a T03, também o `migrate` e as contagens do seed; desde a T06, o login do admin do seed, o `/auth/me` com e sem cookie e o 401 de senha errada.
 - As imagens de produção, o backup e a retomada do worker ficam para a T34.
+
+### Auth (T06)
+
+Camadas: `rotas/auth.ts` (Zod) → `AuthService` → `UsuarioRepository` (Prisma). O hook reutilizável `app.autenticar` (em `plugins/autenticacao.ts`) protege as rotas e preenche `request.usuario = { id, nome, email, papel }`. Registro para a T04 documentar no `openapi.yaml`:
+
+| Método e caminho | Entrada | Saída | Códigos |
+|---|---|---|---|
+| `POST /auth/login` | JSON `{ email, senha }`; e-mail com trim e minúsculas, até 254 caracteres; senha de 1 a 128 caracteres. Nada na query. | `200 { id, nome, papel }` e o cookie de sessão | 200, 400, 401, 429 |
+| `POST /auth/logout` | nada | limpa o cookie; idempotente | 204 |
+| `GET /auth/me` (protegida) | cookie de sessão | `200 { id, nome, email, papel }` | 200, 401 |
+
+- **401 genérico**, igual para login inválido e sessão ausente ou inválida: `{ "erro": "nao_autenticado", "mensagem": "Credenciais inválidas ou sessão expirada." }`. E-mail inexistente, senha errada, docente pendente ou bloqueado e usuário inativo dão a mesma resposta. Todo login roda exatamente um `argon2.verify`: quando o e-mail não existe, contra um hash isca, para o tempo de resposta não revelar se a conta existe.
+- **400:** `{ "erro": "requisicao_invalida", "mensagem": "Requisição inválida." }`, sem detalhar o campo. **429:** `{ "erro": "muitas_tentativas", ... }`, com 10 tentativas de login por minuto por IP (`@fastify/rate-limit`, store em memória).
+- **Cookie** `acif_sessao`: `HttpOnly`, `SameSite=Strict`, `Path=/`, `Max-Age` de 8h e `Secure` só quando `COOKIE_SECURE=true` (no local é http). O token só é aceito no cookie, não no cabeçalho `Authorization`.
+- **JWT:** HS256, com o algoritmo fixo na verificação. Leva só `sub` (id) e `papel`, sem e-mail nem nome. Sem refresh token: a sessão dura 8h. O segredo vem de `JWT_SECRET`, obrigatório em produção (no mínimo 32 caracteres); fora de produção há um padrão de desenvolvimento, e a API avisa no log.
+- **Checagem no banco a cada requisição:** `app.autenticar` confere se o usuário segue `ativo` e `aprovado`. Bloquear ou inativar alguém (T07) derruba a sessão na hora. O logout só limpa o cookie, porque o JWT não tem estado.
+- **Front x API (decisão para a T10):** o front usa o **proxy do Vite** (`/api` → `api:3333`), ficando na mesma origem da API. **Sem CORS** e sem `@fastify/cors`. CSRF fica coberto pelo `SameSite=Strict` e pelo corpo JSON nas rotas que mudam estado.
+- **Logs sem PII:** a URL é logada sem a query string, e corpo, headers e cookies não são logados. O handler de erro não ecoa mensagens de validação nem do banco.
+- **E-mail em minúsculas:** o login normaliza o e-mail antes da busca. Quem grava usuários (T07) precisa gravar o e-mail também em minúsculas.
+- Variáveis: `JWT_SECRET`, `SESSAO_HORAS` (8), `COOKIE_SECURE` (`true` em produção), `LOGIN_RATE_LIMIT_MAX` (10). Veja o `.env.example`.
 
 ## 4. Modelo de dados
 
