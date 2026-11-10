@@ -176,7 +176,7 @@ erDiagram
     }
     canais {
         int id PK
-        varchar nome
+        varchar nome UK "chave do registry de CanalEnvio"
         boolean ativo
     }
     envios {
@@ -196,6 +196,7 @@ erDiagram
 **Restrições**
 
 - `alunos`: chave única em `ra` e em `email`.
+- `canais`: chave única em `nome`, que é a chave do registry de `CanalEnvio` e do upsert do seed.
 - `comunicado_versoes`: chave única em (`id_comunicado`, `id_canal`).
 - `envios`: chave única em (`id_comunicado`, `id_aluno`, `id_canal`), que garante a idempotência do disparo.
 - Status de `comunicados`: `rascunho`, `pronto`, `enviando`, `concluido`, `agendado` (N2).
@@ -209,6 +210,7 @@ erDiagram
 | `titulo` e `conteudo` obrigatórios | Opcionais em `rascunho` e exigidos no disparo | A tela 03 não os coleta. `titulo` vem do assunto do e-mail ou, sem e-mail, do início do prompt |
 | Sem canais no comunicado | `comunicados.canais` (jsonb) | O rascunho guarda os canais escolhidos antes de existir qualquer versão (T12) |
 | Classe `Destinatario` (entidade do `mvp tcc.odt`) | Tabela `envios` | Cada linha é um destinatário em um canal |
+| `canais.nome` sem restrição | Chave única | O registry de `CanalEnvio` e o seed localizam o canal pelo nome; evita canal duplicado e protege a idempotência de `envios` (`/mudanca-contrato` aprovada em 10/11/2026, T03) |
 
 **Destinatários:** o filtro aceita curso, período, turma, termo ou aluno individual. Filtro vazio significa todos os alunos ativos, opção que aparece no fluxograma e no painel. A tela sempre mostra a prévia de contagem antes do disparo.
 

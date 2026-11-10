@@ -111,8 +111,8 @@ tasks:
       - "A migration roda do zero"
       - "O seed cria 1 admin, cerca de 20 alunos e 2 canais"
       - "O seed usa apenas dados sintéticos"
-    status: todo
-    branch: null
+    status: in_progress
+    branch: task/T03-schema-prisma
     pr: null
     concluida_em: null
   - id: T04
