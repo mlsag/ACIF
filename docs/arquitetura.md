@@ -85,6 +85,32 @@ flowchart TB
     Wpp -.-> Aluno
 ```
 
+### Estrutura do repositório e ambiente (T01)
+
+```
+backend/    API (src/server.ts) e worker (src/worker.ts): um código, dois processos
+frontend/   React + Vite + Tailwind
+prompts/    prompts de sistema versionados do LlmProvider
+docs/       documentação, ADRs e TCC
+docker/     Dockerfile.dev (imagem única de desenvolvimento)
+```
+
+- **npm workspaces** na raiz (`backend`, `frontend`): um lockfile, um `npm ci` e um lint compartilhado. Sem nx ou turborepo.
+- **Versões:** Node 26 (LTS ativa em 10/11/2026, fixada em `.nvmrc`) e PostgreSQL 18. As dependências ficam fixadas no `package-lock.json`.
+- **`docker-compose.yml`:** quatro serviços. As portas são publicadas só em 127.0.0.1. O compose sobe sem `.env`, porque os padrões são só de desenvolvimento.
+
+  | Serviço | Porta | Healthcheck |
+  |---|---|---|
+  | `db` | 5432 | `pg_isready` |
+  | `api` | 3333 | `GET /health` |
+  | `worker` | sem porta | sem healthcheck; `restart: unless-stopped` |
+  | `web` | 5173 | `GET /` |
+
+- **CI** (`.github/workflows/ci.yml`), sem segredos e com dois jobs:
+  - `checks`: lint, typecheck, testes e build.
+  - `compose`: sobe o compose e confere o `/health`, a página e o heartbeat do worker.
+- As imagens de produção, o backup e a retomada do worker ficam para a T34.
+
 ## 4. Modelo de dados
 
 O ponto de partida é [`diagrama_classe.png`](design/diagramas/diagrama_classe.png). Apesar do nome, ele é o ER original. O modelo abaixo acrescenta os ajustes aprovados.

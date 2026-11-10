@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, typecheck, testes e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  compose:
+    name: docker compose up
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker compose config -q
+      - run: docker compose up -d --build --wait --wait-timeout 180
+      - run: docker compose ps
+      - run: curl -fsS http://127.0.0.1:3333/health
+      - run: curl -fsS http://127.0.0.1:5173/ | grep -i '<title>ACIF</title>'
+      - name: Worker emitiu heartbeat
+        run: |
+          for _ in $(seq 1 12); do
+            docker compose logs worker | grep -q heartbeat && exit 0
+            sleep 5
+          done
+          docker compose logs worker
+          exit 1
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down -v

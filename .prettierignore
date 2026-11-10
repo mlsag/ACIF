@@ -1,0 +1,10 @@
+# Documentação e configuração de agentes têm formatação própria
+docs/
+.claude/
+prompts/
+*.md
+*.odt
+package-lock.json
+node_modules/
+dist/
+coverage/

@@ -85,8 +85,8 @@ tasks:
     aceite:
       - "docker compose up funciona"
       - "O CI fica verde no PR"
-    status: todo
-    branch: null
+    status: in_progress
+    branch: task/T01-estrutura-repo
     pr: null
     concluida_em: null
   - id: T02
