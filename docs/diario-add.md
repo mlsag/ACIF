@@ -120,3 +120,26 @@ Não é uma task do backlog. Preparou o repositório para o fluxo ADD.
 - **Lições:**
   - A revisão encontrou um efeito colateral da decisão do proxy do Vite: o rate limit do login passaria a ser compartilhado por todos os usuários. Virou o risco R15, a tratar na T10.
   - Fazer o merge antes da revisão funcionou desta vez, mas tira da revisão o poder de barrar a entrada de um problema na `main`.
+
+## T12 — API de comunicados: rascunho (título, conteúdo, canais, filtro, variáveis) (10/11/2026)
+
+- **PR:** #13 (aberto; o merge é do aluno). CI verde no run 42886758588, commit e3d27f8.
+- **O que a IA gerou:**
+  - O agente `backend` propôs o plano e implementou `POST`, `GET` (lista paginada, no máximo 50 por página, em ordem decrescente), `GET /:id`, `PATCH` e `DELETE /comunicados`, em camadas `rota → ComunicadoService → ComunicadoRepository/CanalRepository`.
+  - O dono vem sempre da sessão, e toda consulta do repositório filtra por `id_usuario`.
+  - Edição e exclusão só em rascunho, de forma atômica, com 409 fora dele. Canal inexistente ou inativo dá 422.
+  - Filtro por listas de turma ou por `ids_alunos` (1 a 500); nulo ou `{}` significa todos os alunos ativos. Variáveis: só `{prazo}`.
+  - Escreveu 77 testes de rota e 7 com o banco real.
+  - O agente `qa` revisou com evidências, incluindo teste de ponta a ponta no compose nos dois sentidos (admin e docente sintético), e aprovou sem correções.
+  - Observações não bloqueantes da revisão: página além do total devolve lista vazia; os placeholders dentro do texto só serão validados na T14; o cookie continua válido após o logout até expirar (decisão da T06).
+- **O que o aluno decidiu, corrigiu ou rejeitou:**
+  - Escolheu 404 para comunicado de outro docente, idêntico ao de id inexistente.
+  - Escolheu que o admin vê só os próprios comunicados.
+  - Aceitou os formatos de canais, filtro e variáveis como propostos.
+  - Deixou para a T13 a divergência dos períodos (`Manhã`/`Noite` no seed x `Matutino`/`Vespertino`/`Noturno` no protótipo).
+  - Abriu o PR #13.
+  - Nada foi rejeitado, segundo o aluno.
+- **Prompts relevantes:** nenhum além dos comandos do fluxo (`/proxima-task`, `/executar-task`, `/revisar-task`, `/fechar-task`) e das respostas às perguntas de decisão.
+- **Lições:**
+  - Responder com o mesmo 404 para comunicado alheio e inexistente evita revelar a existência de comunicados de outros docentes.
+  - Desta vez o fluxo seguiu a ordem prevista, com a revisão antes do merge, ao contrário da T06.

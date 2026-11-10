@@ -139,7 +139,7 @@ Camadas: `rotas/comunicados.ts` (Zod) → `ComunicadoService` → `ComunicadoRep
 | Método e caminho | Entrada | Saída | Códigos |
 |---|---|---|---|
 | `POST /comunicados` | JSON com `titulo?`, `conteudo?`, `prompt_original?`, `canais?`, `filtro_destinatarios?`, `variaveis?`. Corpo vazio cria um rascunho vazio | `201` com o comunicado completo | 201, 400, 401, 422 |
-| `GET /comunicados` | query `pagina` (≥ 1, padrão 1) e `por_pagina` (1 a 50, padrão 20) | `200 { itens, pagina, por_pagina, total }`; cada item tem `id, titulo, status, canais, data_criacao, data_envio`. Ordem: `data_criacao` desc, `id` desc | 200, 400, 401 |
+| `GET /comunicados` | query `pagina` (1 a 100.000, padrão 1) e `por_pagina` (1 a 50, padrão 20) | `200 { itens, pagina, por_pagina, total }`; cada item tem `id, titulo, status, canais, data_criacao, data_envio`. Ordem: `data_criacao` desc, `id` desc. Página além do total devolve `itens: []` com o `total` real | 200, 400, 401 |
 | `GET /comunicados/:id` | `id` inteiro de 1 a 2147483647 | `200` com o comunicado completo | 200, 400, 401, 404 |
 | `PATCH /comunicados/:id` | os mesmos campos do POST, parciais; `null` limpa o campo (exceto `canais`, que se limpa com `[]`) | `200` com o comunicado completo | 200, 400, 401, 404, 409, 422 |
 | `DELETE /comunicados/:id` | nada | `204`; apaga também as `comunicado_versoes` | 204, 400, 401, 404, 409 |
@@ -148,7 +148,7 @@ Camadas: `rotas/comunicados.ts` (Zod) → `ComunicadoService` → `ComunicadoRep
 - **Textos:** `titulo` até 200 caracteres, `conteudo` até 10.000 e `prompt_original` até 600 (limite da tela 03). Os textos passam por trim, e string vazia vira `null`. `titulo` e `conteudo` são opcionais no rascunho e exigidos no disparo (T16). `prompt_original` é o texto do docente que o `/gerar` (T22) envia ao LLM; a T12 só o armazena.
 - **`canais`:** lista de `canais.nome` (`email`, `whatsapp`), sem repetição. Vazia no rascunho é aceita. Nome desconhecido dá 400; canal ausente da tabela `canais` ou inativo dá 422.
 - **`filtro_destinatarios`:** uma de duas formas, com objetos estritos (misturar as duas dá 400):
-  - por turma: `{ curso?, periodo?, turma?, termo? }`, cada um uma lista de textos. Os campos se combinam com E e os valores de um campo com OU;
+  - por turma: `{ curso?, periodo?, turma?, termo? }`, cada um uma lista de até 50 textos (até 120 caracteres em `curso` e até 20 nos demais). Os campos se combinam com E e os valores de um campo com OU;
   - aluno individual: `{ ids_alunos: [1, 2] }`, de 1 a 500 ids e só ids, sem outro dado do aluno. `ids_alunos: []` dá 400, para não virar "todos".
   - `null`, `{}` ou só listas vazias significam **todos os alunos ativos** e são gravados como SQL NULL. Repetições são removidas.
 - **`variaveis`:** `{ prazo?: string }` (1 a 100 caracteres, texto livre). Qualquer outra chave dá 400. `nome_aluno`, `curso` e `termo` vêm do cadastro do aluno na renderização. `{}` é gravado como NULL. A validação dos placeholders dentro dos textos fica para a T14; a whitelist está em `PLACEHOLDERS` (`backend/src/dominio/valores.ts`).
