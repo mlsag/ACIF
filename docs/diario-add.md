@@ -51,3 +51,24 @@ Não é uma task do backlog. Preparou o repositório para o fluxo ADD.
 - **Lições:**
   - Vale conferir em fonte oficial se uma orientação é viável antes de registrá-la: foi essa pesquisa que mostrou que a API da OpenAI não tem uso gratuito para texto.
   - Marcar como interpretação o que não foi dito de forma explícita, como os ADRs 0007 e 0008 e o momento do round robin, deixa claro o que ainda precisa da confirmação do orientador.
+
+## T01 — Estrutura do repo, docker-compose, lint e GitHub Actions (10/11/2026)
+
+- **PR:** #8 (aberto; o merge é do aluno). CI verde no run 42846111009, jobs `checks` e `compose`, commit 4e8c9a3.
+- **O que a IA gerou:**
+  - O agente `arquiteto` propôs o plano e verificou em container que a LTS ativa era o Node 26.13.0.
+  - Implementou o esqueleto em npm workspaces, com backend Fastify e frontend React/Vite/Tailwind.
+  - Criou o docker-compose com `db`, `api`, `worker` e `web`, a configuração de ESLint, Prettier, TypeScript e Vitest e o workflow de CI.
+  - O agente `qa` revisou com evidências, incluindo um teste de falha derrubando o banco.
+  - Desvios feitos pela IA por conta própria, aceitos pelo aluno: TypeScript 6.0.3 em vez do 7, porque o typescript-eslint ainda não suporta o 7; worker dividido em dois arquivos para ser testável; arquivos de configuração além dos previstos.
+- **O que o aluno decidiu, corrigiu ou rejeitou:**
+  - Aprovou o plano.
+  - Escolheu usar `DOCKER_CONTEXT=default` sem mudar a configuração do Docker.
+  - Escolheu o Node 26, com o 24 como plano B.
+  - Dispensou o `act`: o workflow foi validado só com o actionlint.
+  - Abriu o PR #8.
+  - Nada foi rejeitado, segundo o aluno.
+- **Prompts relevantes:** nenhum além dos comandos do fluxo (`/proxima-task`, `/executar-task`, `/revisar-task`, `/fechar-task`) e das respostas às perguntas de decisão.
+- **Lições:**
+  - Rodar as ferramentas em container evitou instalar Node na máquina do aluno.
+  - Verificar a versão LTS em vez de presumi-la mudou a escolha do Node 20, previsto no plano original, para o 26.

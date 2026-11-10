@@ -92,7 +92,6 @@ Só por `/mudanca-contrato`. Vale para `schema.prisma`, `openapi.yaml` e as inte
 
 ## Comandos do projeto
 
-<!-- TODO(T01): substituir pelos comandos reais quando a T01 criá-los. -->
 
 Não há Node instalado na máquina: o npm roda dentro do container `node:26-slim`, e todo comando Docker usa o contexto `default` por variável. Não rode `docker context use` nem altere `~/.docker`.
 
