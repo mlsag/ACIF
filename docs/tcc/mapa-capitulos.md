@@ -9,7 +9,9 @@ Liga cada capítulo ao marco e às fontes de evidência. O conteúdo é redigido
 | Modelagem e arquitetura | M2 | T12–T14, T16–T18 | `docs/arquitetura.md`, `schema.prisma`, `openapi.yaml`, ADR 0001, código do worker |
 | Integrações e IA | M3 | T19–T24, T42 | ADRs 0002, 0003, 0004, 0006 e 0007; `/prompts`; código de `CanalEnvio` e `LlmProvider` |
 | Telas e resultados parciais | M4 | T25–T32, T43 | `docs/design/telas/`, código do front, E2E Playwright |
-| Testes e resultados | M5 | T34–T39 | `docs/testes.md`, relatório da T36, termo de consentimento, checklist da T35, ADRs 0005 e 0009, CI |
+| Testes e resultados | M5 | T34–T38 | `docs/testes.md`, relatório da T36, termo de consentimento, checklist da T35, ADRs 0005 e 0009, CI |
 | Conclusão | M6 | T40, T41, T44 | Todos os anteriores, `docs/riscos.md`, `docs/roadmap.md`, `docs/diario-add.md` |
+
+A T39 entrega o texto completo ao orientador até 16/11/2026 (M3). Os capítulos ligados a marcos posteriores vão nessa data com `[VERIFICAR]` onde faltarem resultados, e são completados com os dados reais depois da T36.
 
 Regra: nenhum capítulo traz resultado, número ou citação sem fonte verificável.

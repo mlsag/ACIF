@@ -18,6 +18,7 @@
 # - LGPD acadêmica: T03, T35, T36, T37 e nova T44;
 # - Groq + Gemini em round robin e Meta Cloud API: T19, T21, T25;
 # - texto do TCC entregue até 25/11/2026: T39 sai de M6 para M5 e não espera T38.
+# - 10/11/2026: o aluno antecipou a entrega do texto para 16/11/2026; T39 passa para M3.
 
 marcos:
   - id: M0
@@ -42,7 +43,7 @@ marcos:
     nome: WhatsApp + IA
     inicio: 2026-11-14
     fim: 2026-11-17
-    pronto_quando: "Comunicado gerado pela IA é enviado pelos 2 canais a números de teste; script E2E via API"
+    pronto_quando: "Comunicado gerado pela IA é enviado pelos 2 canais a números de teste; script E2E via API; texto do TCC entregue ao orientador até 16/11/2026"
     capitulo_tcc: "Integrações e IA"
   - id: M4
     nome: Front integrado
@@ -54,7 +55,7 @@ marcos:
     nome: Estabilização
     inicio: 2026-11-22
     fim: 2026-11-25
-    pronto_quando: "Sistema completo sobe localmente em containers; relatório de testes; docs refletem o código; tag v1.0; texto do TCC entregue ao orientador até 25/11/2026"
+    pronto_quando: "Sistema completo sobe localmente em containers; relatório de testes; docs refletem o código; tag v1.0; capítulos de testes e resultados completos"
     capitulo_tcc: "Testes e resultados"
   - id: M6
     nome: TCC + defesa
@@ -583,13 +584,14 @@ tasks:
     pr: null
     concluida_em: null
   - id: T39
-    marco: M5
+    marco: M3
     nivel: N1
     agente: documentacao
     depende: [T05]
     titulo: "Texto do TCC com anexos, escrito em paralelo e entregue para correção"
     aceite:
-      - "Versão completa entregue ao orientador o quanto antes, no máximo até 25/11/2026"
+      - "Versão completa entregue ao orientador até 16/11/2026, com [VERIFICAR] nos resultados que ainda não existirem"
+      - "Os capítulos de testes e resultados foram completados com os dados reais depois da T36"
       - "O disclaimer da LGPD consta do texto"
       - "As correções do orientador foram incorporadas antes da submissão"
     status: todo
