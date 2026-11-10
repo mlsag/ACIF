@@ -70,6 +70,23 @@ jobs:
           test "$(contar "select count(*) from canais")" = "2"
           test "$(contar "select count(*) from alunos where email not like '%@example.com'")" = "0"
       - run: curl -fsS http://127.0.0.1:3333/health
+      - name: Auth de ponta a ponta (T06)
+        # Admin do seed com a senha só de desenvolvimento, que já está no Git (prisma/seed-dados.ts).
+        # Mostra só os status; o token fica no cookie jar e não vai para o log.
+        run: |
+          api=http://127.0.0.1:3333
+          jar="$RUNNER_TEMP/cookies.txt"
+          status() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+          login=$(status -c "$jar" -H 'Content-Type: application/json' \
+            -d '{"email":"admin@example.com","senha":"acif-dev-somente-local"}' "$api/auth/login")
+          echo "login: $login"; test "$login" = "200"
+          me=$(status -b "$jar" "$api/auth/me")
+          echo "/auth/me com cookie: $me"; test "$me" = "200"
+          sem=$(status "$api/auth/me")
+          echo "/auth/me sem cookie: $sem"; test "$sem" = "401"
+          errada=$(status -H 'Content-Type: application/json' \
+            -d '{"email":"admin@example.com","senha":"senha-errada-qualquer"}' "$api/auth/login")
+          echo "login com senha errada: $errada"; test "$errada" = "401"
       - run: curl -fsS http://127.0.0.1:5173/ | grep -i '<title>ACIF</title>'
       - name: Worker emitiu heartbeat
         run: |
