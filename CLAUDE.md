@@ -115,7 +115,19 @@ dnpm run build
 # Validar o workflow do CI
 docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest
 
-TODO (T03): migrations e seed
+# Migrations e seed (Prisma 7.10.1 fixado; não use a tag latest, que hoje é um RC 8.x)
+# O `up` já roda o serviço migrate: generate + migrate deploy + seed (SEED_AUTO=false pula o seed)
+docker compose run --rm migrate npm run db:seed -w backend      # seed de novo (sem duplicar)
+docker compose run --rm migrate npm run db:status -w backend    # estado das migrations
+docker compose logs migrate
+# Nova migration após mudar o schema.prisma (só com /mudanca-contrato aprovada), com o db de pé
+docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp --network acif_default \
+  -e DATABASE_URL=postgresql://acif:acif_dev@db:5432/acif -v "$PWD":/app -w /app/backend \
+  node:26-slim npx prisma migrate dev --name <nome>
+# Testes com o banco acif_test (sem TEST_DATABASE_URL, os testes de banco são pulados; no CI são obrigatórios)
+docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp --network acif_default \
+  -e TEST_DATABASE_URL=postgresql://acif:acif_dev@db:5432/acif_test -v "$PWD":/app -w /app \
+  node:26-slim npm test
 ```
 
 ## Documentação

@@ -13,3 +13,6 @@ coverage/
 # Logs e sistema
 *.log
 .DS_Store
+
+# Cliente Prisma gerado (prisma generate)
+backend/src/generated/
