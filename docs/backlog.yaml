@@ -216,7 +216,7 @@ tasks:
     titulo: "Página com QR code do formulário"
     aceite:
       - "PNG gerado a partir da URL do formulário no ambiente local"
-    status: todo
+    status: cut  # regra de corte, 10/11/2026: M0 com 5 dias de atraso
     branch: null
     pr: null
     concluida_em: null
