@@ -143,3 +143,29 @@ Não é uma task do backlog. Preparou o repositório para o fluxo ADD.
 - **Lições:**
   - Responder com o mesmo 404 para comunicado alheio e inexistente evita revelar a existência de comunicados de outros docentes.
   - Desta vez o fluxo seguiu a ordem prevista, com a revisão antes do merge, ao contrário da T06.
+
+## T14 — Renderizador de variáveis (whitelist) + validação prévia (12/11/2026)
+
+- **PR:** #14 (aberto; o merge é do aluno). CI verde no commit 35696f6, jobs `checks` e `compose`.
+- **O que a IA gerou:**
+  - O agente `integracao` propôs o plano e implementou o módulo puro `backend/src/dominio/renderizador.ts` (`analisarTemplate`, `validarDisparo`, `renderizar`), sem rota nova e sem mudança de contrato.
+  - A origem de cada placeholder é tipada com `satisfies`: placeholder sem origem não compila.
+  - A substituição é feita numa passada só, e os erros não trazem dado de aluno.
+  - Escreveu 29 testes unitários.
+  - Desvios do agente, aceitos pelo aluno: `renderizar` também devolve `template_invalido`; os erros indicam o `canal`.
+  - O agente `qa` revisou com evidências e com casos adversos além dos testes (Unicode, `{__proto__}`, 100 mil ocorrências) e aprovou sem bloqueantes.
+  - A revisão encontrou:
+    - um teste instável da T06: a troca do último caractere da assinatura do JWT às vezes não altera o token (cerca de 1 em 16 execuções), a corrigir em separado;
+    - duas imprecisões na doc da arquitetura, corrigidas no fechamento;
+    - pontos para a T16: validar `variaveis` com Zod e tratar 0 destinatários.
+- **O que o aluno decidiu, corrigiu ou rejeitou:**
+  - Escolheu a sintaxe estrita, sem escape.
+  - Escolheu validar só no disparo, não no rascunho.
+  - Escolheu que aluno sem valor bloqueia o disparo inteiro, com a contagem de afetados.
+  - Escolheu não criar endpoint novo de pré-validação.
+  - Abriu o PR #14.
+  - Nada foi rejeitado, segundo o aluno.
+- **Prompts relevantes:** nenhum além dos comandos do fluxo (`/proxima-task`, `/executar-task`, `/revisar-task`, `/fechar-task`) e das respostas às perguntas de decisão.
+- **Lições:**
+  - Um módulo puro permitiu provar os critérios do disparo com testes unitários antes de a T16 existir.
+  - Testar casos adversos fora da suíte revelou um teste instável antigo, que poderia derrubar o CI ao acaso.
