@@ -125,8 +125,8 @@ tasks:
     aceite:
       - "O front gera tipos a partir do openapi.yaml"
       - "O front gera mocks a partir do openapi.yaml"
-    status: todo
-    branch: null
+    status: in_progress
+    branch: task/T04-openapi
     pr: null
     concluida_em: null
   - id: T05

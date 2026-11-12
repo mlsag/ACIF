@@ -9,4 +9,6 @@ node_modules/
 dist/
 coverage/
 backend/src/generated/
+# Tipos gerados do openapi.yaml (npm run gerar:api -w frontend)
+frontend/src/api/schema.gerado.ts
 backend/prisma/migrations/

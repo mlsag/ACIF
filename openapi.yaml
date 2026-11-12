@@ -1,0 +1,1467 @@
+# Contrato HTTP do ACIF (T04). Mudanças só por /mudanca-contrato.
+# Fonte: docs/arquitetura.md (Auth T06, Docentes T07, Comunicados T12, Renderizador T14, seções 6 e 7)
+# e backend/src/rotas/*.ts. As operações já implementadas descrevem o código; as planejadas
+# (x-acif-status: planejado) são a proposta aprovada em 12/11/2026, com as lacunas marcadas
+# como "Pendente" na description, que a task dona decide.
+# Tipos do front: npm run gerar:api -w frontend (gera frontend/src/api/schema.gerado.ts).
+openapi: 3.1.1
+info:
+  title: ACIF — App de Comunicação Interna Fatec
+  version: 0.1.0
+  description: |
+    API do ACIF. Sessão em cookie httpOnly `acif_sessao` (JWT HS256, 8h), aceito só no cookie.
+
+    - Erros sempre no formato `{ erro, mensagem }`, sem detalhar o campo inválido nem ecoar dados
+      da requisição.
+    - Dados só no corpo JSON, nunca na query (a URL vai para o log, sem a query string).
+    - `x-acif-status: implementado` descreve o código atual; `planejado` é contrato aprovado mas
+      ainda não implementado, com a task dona em `x-acif-task`.
+  license:
+    name: Uso acadêmico (TCC Fatec Garça)
+    identifier: LicenseRef-ACIF-TCC
+servers:
+  - url: /api
+    description: Front, pelo proxy do Vite (mesma origem, sem CORS; T10)
+  - url: http://localhost:3333
+    description: API direta no ambiente local
+security:
+  - sessao: []
+tags:
+  - name: saude
+    description: Healthcheck
+  - name: auth
+    description: Login, logout e sessão (T06)
+  - name: docentes
+    description: Cadastro público de docente e aprovação pelo admin (T07)
+  - name: comunicados
+    description: Rascunho de comunicado (T12)
+  - name: alunos
+    description: Consulta de alunos (T09)
+  - name: destinatarios
+    description: Prévia de contagem de destinatários (T13)
+  - name: versoes
+    description: Versões por canal geradas pela IA ou editadas (T22)
+  - name: disparo
+    description: Disparo transacional e idempotente (T16)
+  - name: envios
+    description: Status dos envios por comunicado (T18)
+
+paths:
+  /health:
+    get:
+      tags: [saude]
+      operationId: saude
+      summary: Healthcheck da API
+      security: []
+      x-acif-status: implementado
+      x-acif-task: T01
+      responses:
+        '200':
+          description: API no ar
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                additionalProperties: false
+                properties:
+                  status:
+                    type: string
+                    const: ok
+              example:
+                status: ok
+
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Entra e recebe o cookie de sessão
+      description: |
+        Responde o mesmo 401 para e-mail inexistente, senha errada, docente pendente ou bloqueado e
+        usuário inativo. Rate limit por IP (LOGIN_RATE_LIMIT_MAX por minuto, padrão 10).
+      security: []
+      x-acif-status: implementado
+      x-acif-task: T06
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+            example:
+              email: docente.a@example.com
+              senha: senha-sintetica-de-teste
+      responses:
+        '200':
+          description: Sessão criada
+          headers:
+            Set-Cookie:
+              description: '`acif_sessao=<jwt>; Max-Age=28800; Path=/; HttpOnly; SameSite=Strict` (Secure com COOKIE_SECURE=true)'
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioLogin'
+              example:
+                id: 1
+                nome: Docente Sintético A
+                papel: docente
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '429':
+          $ref: '#/components/responses/MuitasTentativas'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Limpa o cookie de sessão (idempotente)
+      description: Funciona mesmo sem sessão. O JWT não tem estado; a expiração e a checagem no banco barram um token copiado.
+      security: []
+      x-acif-status: implementado
+      x-acif-task: T06
+      responses:
+        '204':
+          description: Cookie limpo
+          headers:
+            Set-Cookie:
+              description: '`acif_sessao=; Expires=<passado>; Path=/; HttpOnly; SameSite=Strict`'
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: obterSessao
+      summary: Usuário da sessão atual
+      description: A cada requisição, a API confere no banco se o usuário segue ativo e aprovado.
+      x-acif-status: implementado
+      x-acif-task: T06
+      responses:
+        '200':
+          description: Usuário autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioSessao'
+              example:
+                id: 1
+                nome: Docente Sintético A
+                email: docente.a@example.com
+                papel: docente
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /docentes/cadastro:
+    post:
+      tags: [docentes]
+      operationId: cadastrarDocente
+      summary: Cadastro público de docente (nasce pendente)
+      description: |
+        Mesma resposta 202 para conta nova e e-mail já cadastrado (não revela se a conta existe).
+        Papel e status são sempre definidos pelo servidor. Rate limit por IP
+        (CADASTRO_RATE_LIMIT_MAX por hora, padrão 5); requisições inválidas também consomem a cota.
+      security: []
+      x-acif-status: implementado
+      x-acif-task: T07
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CadastroDocente'
+            example:
+              nome: Docente Sintético C
+              email: docente.c@example.com
+              senha: senha-sintetica-longa
+      responses:
+        '202':
+          description: Solicitação recebida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mensagem'
+              example:
+                mensagem: Solicitação recebida. O acesso será liberado após a aprovação da coordenação.
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '429':
+          $ref: '#/components/responses/MuitasTentativas'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /docentes:
+    get:
+      tags: [docentes]
+      operationId: listarDocentes
+      summary: Lista docentes (só admin)
+      description: Só `papel = docente`. Ordem por `data_cadastro` desc e `id` desc.
+      x-acif-status: implementado
+      x-acif-task: T07
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/StatusAprovacao'
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/PorPagina'
+      responses:
+        '200':
+          description: Página de docentes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaDocentes'
+              example:
+                itens:
+                  - id: 1000
+                    nome: Docente Sintético C
+                    email: docente.c@example.com
+                    status_aprovacao: pendente
+                    data_cadastro: '2026-11-12T10:00:00.000Z'
+                pagina: 1
+                por_pagina: 20
+                total: 1
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/AcessoNegado'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /docentes/{id}/aprovar:
+    post:
+      tags: [docentes]
+      operationId: aprovarDocente
+      summary: Aprova um docente (só admin); também reativa um bloqueado
+      description: |
+        Idempotente: pedir o status em que o docente já está responde 200 sem nova escrita.
+        Id de admin dá o mesmo 404 de id inexistente. Sem corpo.
+      x-acif-status: implementado
+      x-acif-task: T07
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/DocenteDecidido'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/AcessoNegado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /docentes/{id}/bloquear:
+    post:
+      tags: [docentes]
+      operationId: bloquearDocente
+      summary: Bloqueia um docente (só admin); a sessão dele cai na próxima requisição
+      description: |
+        Idempotente: pedir o status em que o docente já está responde 200 sem nova escrita.
+        Id de admin dá o mesmo 404 de id inexistente. Sem corpo.
+      x-acif-status: implementado
+      x-acif-task: T07
+      parameters:
+        - $ref: '#/components/parameters/Id'
+      responses:
+        '200':
+          $ref: '#/components/responses/DocenteDecidido'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '403':
+          $ref: '#/components/responses/AcessoNegado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflito'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /comunicados:
+    post:
+      tags: [comunicados]
+      operationId: criarComunicado
+      summary: Cria um rascunho (corpo vazio cria um rascunho vazio)
+      description: O dono é sempre o usuário da sessão, nunca o corpo.
+      x-acif-status: implementado
+      x-acif-task: T12
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorpoComunicado'
+            example:
+              titulo: Entrega do Projeto Integrador
+              prompt_original: Avisar sobre a entrega do projeto integrador até sexta 23h59
+              canais: [email, whatsapp]
+              filtro_destinatarios:
+                curso: [Gestão Empresarial]
+                termo: ['4']
+              variaveis:
+                prazo: 20/11/2026
+      responses:
+        '201':
+          $ref: '#/components/responses/Comunicado'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '422':
+          $ref: '#/components/responses/CanalIndisponivel'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+    get:
+      tags: [comunicados]
+      operationId: listarComunicados
+      summary: Lista os comunicados do usuário da sessão
+      description: |
+        O admin também só vê os próprios. Ordem por `data_criacao` desc e `id` desc. Página além do
+        total devolve `itens: []` com o `total` real.
+      x-acif-status: implementado
+      x-acif-task: T12
+      parameters:
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/PorPagina'
+      responses:
+        '200':
+          description: Página de comunicados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaComunicados'
+              example:
+                itens:
+                  - id: 1
+                    titulo: Entrega do Projeto Integrador
+                    status: rascunho
+                    canais: [email, whatsapp]
+                    data_criacao: '2026-11-12T10:00:00.000Z'
+                    data_envio: null
+                pagina: 1
+                por_pagina: 20
+                total: 1
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /comunicados/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [comunicados]
+      operationId: obterComunicado
+      summary: Comunicado completo
+      description: Comunicado de outro usuário responde o mesmo 404 de id inexistente.
+      x-acif-status: implementado
+      x-acif-task: T12
+      responses:
+        '200':
+          $ref: '#/components/responses/Comunicado'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+    patch:
+      tags: [comunicados]
+      operationId: atualizarComunicado
+      summary: Altera um rascunho (campos parciais)
+      description: |
+        `null` limpa o campo, exceto `canais`, que se limpa com `[]`. Só rascunho é editável.
+        Ordem das checagens: 404 → 409 → 422.
+      x-acif-status: implementado
+      x-acif-task: T12
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorpoComunicado'
+            example:
+              conteudo: 'Olá, {nome_aluno}! A entrega do Projeto Integrador vai até {prazo}.'
+      responses:
+        '200':
+          $ref: '#/components/responses/Comunicado'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/ComunicadoNaoEditavel'
+        '422':
+          $ref: '#/components/responses/CanalIndisponivel'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+    delete:
+      tags: [comunicados]
+      operationId: excluirComunicado
+      summary: Exclui um rascunho (e as versões dele)
+      x-acif-status: implementado
+      x-acif-task: T12
+      responses:
+        '204':
+          description: Excluído
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/ComunicadoNaoEditavel'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        default:
+          $ref: '#/components/responses/OutroErroCliente'
+
+  /alunos:
+    get:
+      tags: [alunos]
+      operationId: listarAlunos
+      summary: Lista alunos com filtros, busca e paginação (planejado)
+      description: |
+        Planejado (T09). Exige sessão de usuário aprovado. Por minimização (LGPD), o item não traz
+        e-mail nem telefone.
+
+        Pendente (T09/T13): alinhar os valores de `periodo` (o seed grava `Manhã`/`Noite`; a tela 03
+        mostra `Matutino`/`Vespertino`/`Noturno`); se a lista inclui alunos inativos; ordem.
+      x-acif-status: planejado
+      x-acif-task: T09
+      parameters:
+        - name: curso
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 120
+        - name: periodo
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 20
+        - name: turma
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 20
+        - name: termo
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 20
+        - name: busca
+          in: query
+          required: false
+          description: Trecho do RA ou do nome.
+          schema:
+            type: string
+            maxLength: 120
+        - $ref: '#/components/parameters/Pagina'
+        - $ref: '#/components/parameters/PorPagina'
+      responses:
+        '200':
+          description: Página de alunos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaAlunos'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+
+  /destinatarios/previa:
+    post:
+      tags: [destinatarios]
+      operationId: previaDestinatarios
+      summary: Prévia de contagem de destinatários (planejado)
+      description: |
+        Planejado (T13). POST para manter o filtro no corpo, fora da URL. Filtro `null` significa
+        todos os alunos ativos. Exclui inativos e alunos sem contato válido.
+
+        Pendente (T13): a semântica exata de `total` (proposta: alunos ativos distintos que casam
+        com o filtro) e de `por_canal` (proposta: quantos deles têm contato válido em cada canal
+        pedido).
+      x-acif-status: planejado
+      x-acif-task: T13
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoPrevia'
+      responses:
+        '200':
+          description: Contagem
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviaDestinatarios'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+
+  /comunicados/{id}/gerar:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [versoes]
+      operationId: gerarVersoes
+      summary: Gera as versões de e-mail e WhatsApp com a IA (planejado)
+      description: |
+        Planejado (T22, sobre o GeracaoIAService da T21). Envia ao LLM só o `prompt_original` do
+        comunicado (nunca dado de aluno). Uma chamada, validação Zod e da whitelist, 1 retry no
+        outro provedor. "Reescrever" repete esta chamada. Se os dois provedores falharem, 503
+        `ia_indisponivel`, e o front libera a escrita manual.
+
+        Pendente (T22): se a geração sobrescreve versões já editadas; resposta para comunicado sem
+        `prompt_original` ou fora de rascunho; o que a API faz com o `variaveis.prazo` que o LLM
+        devolve (arquitetura, seção 6).
+      x-acif-status: planejado
+      x-acif-task: T22
+      responses:
+        '200':
+          description: Versões geradas e salvas com `origem = ia`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [versoes]
+                properties:
+                  versoes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Versao'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+        '503':
+          description: IA indisponível; o front libera a escrita manual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErroIaIndisponivel'
+
+  /comunicados/{id}/versoes/{canal}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: canal
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/NomeCanal'
+    patch:
+      tags: [versoes]
+      operationId: editarVersao
+      summary: Edita a versão de um canal (planejado)
+      description: |
+        Planejado (T22). Marca `editado = true`. O WhatsApp não tem assunto.
+
+        Pendente (T23): como a versão manual é criada quando a IA falha (este PATCH com upsert e
+        `origem = manual`, ou outra operação). Pendente (T22): limites de tamanho do
+        `corpo_template` e resposta para versão inexistente.
+      x-acif-status: planejado
+      x-acif-task: T22
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EdicaoVersao'
+      responses:
+        '200':
+          description: Versão atualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Versao'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '409':
+          $ref: '#/components/responses/ComunicadoNaoEditavel'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+
+  /comunicados/{id}/disparar:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [disparo]
+      operationId: dispararComunicado
+      summary: Dispara o comunicado (planejado)
+      description: |
+        Planejado (T16). Numa transação: resolve o filtro em alunos, valida os placeholders
+        (`validarDisparo`), congela as versões e cria os envios pendentes. A chave única
+        (comunicado, aluno, canal) impede envios duplicados. Exige `titulo`, `conteudo` e ao menos
+        um canal ativo. Se a validação falhar, 422 com a lista de erros do renderizador, sem criar
+        envios e sem mudar o status. Os erros não trazem dado de aluno, mas podem repetir texto do
+        docente: não devem ser logados.
+
+        Pendente (T16): a resposta do 2º disparo (409 ou o mesmo 202); o caso de 0 destinatários;
+        o código de erro para título, conteúdo ou canal ausentes ou canal inativo.
+      x-acif-status: planejado
+      x-acif-task: T16
+      responses:
+        '202':
+          description: Disparo aceito; o worker envia em segundo plano
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [total_envios]
+                properties:
+                  total_envios:
+                    type: integer
+                    minimum: 0
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '422':
+          description: Placeholders inválidos ou sem valor; nada foi criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErroDisparoInvalido'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+
+  /comunicados/{id}/envios/resumo:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [envios]
+      operationId: resumoEnvios
+      summary: Contagem por status e lista de falhas do comunicado (planejado)
+      description: |
+        Planejado (T18). Comunicado de outro usuário dá o mesmo 404 de id inexistente.
+
+        Pendente (T18): quais dados do aluno aparecem em cada falha (PII; proposta mínima: nenhum
+        além do necessário para o docente agir) e se a lista de falhas é paginada.
+      x-acif-status: planejado
+      x-acif-task: T18
+      responses:
+        '200':
+          description: Resumo dos envios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumoEnvios'
+        '400':
+          $ref: '#/components/responses/RequisicaoInvalida'
+        '401':
+          $ref: '#/components/responses/NaoAutenticado'
+        '404':
+          $ref: '#/components/responses/NaoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErroInterno'
+
+components:
+  securitySchemes:
+    sessao:
+      type: apiKey
+      in: cookie
+      name: acif_sessao
+      description: JWT HS256 com só `sub` (id) e `papel`, criado pelo login. Não é aceito no cabeçalho Authorization.
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: Inteiro de 1 a 2147483647, sem sinal, zeros à esquerda ou decimal.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 2147483647
+    Pagina:
+      name: pagina
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100000
+        default: 1
+    PorPagina:
+      name: por_pagina
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+
+  responses:
+    RequisicaoInvalida:
+      description: Requisição inválida (sem detalhar o campo)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroRequisicaoInvalida'
+          example:
+            erro: requisicao_invalida
+            mensagem: Requisição inválida.
+    NaoAutenticado:
+      description: Credenciais inválidas ou sessão ausente, inválida ou expirada (resposta única)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroNaoAutenticado'
+          example:
+            erro: nao_autenticado
+            mensagem: Credenciais inválidas ou sessão expirada.
+    AcessoNegado:
+      description: Rota só do admin
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroAcessoNegado'
+          example:
+            erro: acesso_negado
+            mensagem: Acesso restrito ao administrador.
+    NaoEncontrado:
+      description: Não existe ou não pertence ao usuário (indistinguíveis de propósito)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroNaoEncontrado'
+          example:
+            erro: nao_encontrado
+            mensagem: Comunicado não encontrado.
+    Conflito:
+      description: O status do docente mudou durante a operação
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroConflito'
+          example:
+            erro: conflito
+            mensagem: O status do docente mudou durante a operação. Recarregue e tente de novo.
+    ComunicadoNaoEditavel:
+      description: Só comunicados em rascunho podem ser alterados ou excluídos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroComunicadoNaoEditavel'
+          example:
+            erro: comunicado_nao_editavel
+            mensagem: Só comunicados em rascunho podem ser alterados ou excluídos.
+    CanalIndisponivel:
+      description: Canal ausente da tabela canais ou inativo
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroCanalIndisponivel'
+          example:
+            erro: canal_indisponivel
+            mensagem: Canal inexistente ou inativo.
+    MuitasTentativas:
+      description: Rate limit atingido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroMuitasTentativas'
+          example:
+            erro: muitas_tentativas
+            mensagem: Muitas tentativas. Aguarde e tente de novo.
+    ErroInterno:
+      description: Erro interno, sem detalhes
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroInterno'
+          example:
+            erro: erro_interno
+            mensagem: Erro interno.
+    OutroErroCliente:
+      description: |
+        Outro 4xx gerado pelo Fastify antes da rota (ex.: 415 por Content-Type não suportado, 413
+        por corpo grande), com o mesmo corpo genérico do 400.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErroRequisicaoInvalida'
+    Comunicado:
+      description: Comunicado completo
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ComunicadoDetalhe'
+          example:
+            id: 1
+            titulo: Entrega do Projeto Integrador
+            conteudo: 'Olá, {nome_aluno}! A entrega do Projeto Integrador vai até {prazo}.'
+            prompt_original: Avisar sobre a entrega do projeto integrador até sexta 23h59
+            status: rascunho
+            canais: [email, whatsapp]
+            filtro_destinatarios:
+              curso: [Gestão Empresarial]
+              termo: ['4']
+            variaveis:
+              prazo: 20/11/2026
+            data_criacao: '2026-11-12T10:00:00.000Z'
+            data_envio: null
+    DocenteDecidido:
+      description: Docente após a decisão
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Docente'
+          example:
+            id: 1000
+            nome: Docente Sintético C
+            email: docente.c@example.com
+            status_aprovacao: aprovado
+            data_cadastro: '2026-11-12T10:00:00.000Z'
+
+  schemas:
+    Papel:
+      type: string
+      enum: [admin, docente]
+    StatusAprovacao:
+      type: string
+      enum: [pendente, aprovado, bloqueado]
+    StatusComunicado:
+      type: string
+      description: '`agendado` é N2.'
+      enum: [rascunho, pronto, enviando, concluido, agendado]
+    NomeCanal:
+      type: string
+      description: Nome em `canais.nome`, chave do registry de CanalEnvio.
+      enum: [email, whatsapp]
+    OrigemVersao:
+      type: string
+      enum: [ia, manual]
+
+    Mensagem:
+      type: object
+      required: [mensagem]
+      additionalProperties: false
+      properties:
+        mensagem:
+          type: string
+
+    Login:
+      type: object
+      required: [email, senha]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Com trim e minúsculas no servidor.
+        senha:
+          type: string
+          minLength: 1
+          maxLength: 128
+    UsuarioLogin:
+      type: object
+      required: [id, nome, papel]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        papel:
+          $ref: '#/components/schemas/Papel'
+    UsuarioSessao:
+      type: object
+      required: [id, nome, email, papel]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        email:
+          type: string
+        papel:
+          $ref: '#/components/schemas/Papel'
+
+    CadastroDocente:
+      type: object
+      required: [nome, email, senha]
+      additionalProperties: false
+      properties:
+        nome:
+          type: string
+          minLength: 2
+          maxLength: 120
+          description: Com trim no servidor.
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: Com trim e minúsculas no servidor.
+        senha:
+          type: string
+          minLength: 12
+          maxLength: 128
+          description: Sem regras de composição (NIST 800-63B).
+    Docente:
+      type: object
+      required: [id, nome, email, status_aprovacao, data_cadastro]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        nome:
+          type: string
+        email:
+          type: string
+        status_aprovacao:
+          $ref: '#/components/schemas/StatusAprovacao'
+        data_cadastro:
+          type: string
+          format: date-time
+    PaginaDocentes:
+      type: object
+      required: [itens, pagina, por_pagina, total]
+      additionalProperties: false
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Docente'
+        pagina:
+          type: integer
+        por_pagina:
+          type: integer
+        total:
+          type: integer
+
+    FiltroTurma:
+      type: object
+      description: Campos combinados com E; valores de um campo combinados com OU. Sem critério, vale todos os alunos ativos.
+      additionalProperties: false
+      properties:
+        curso:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 120
+        periodo:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 20
+        turma:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 20
+        termo:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 20
+    FiltroAlunos:
+      type: object
+      description: Aluno individual, só por id. Lista vazia é rejeitada.
+      required: [ids_alunos]
+      additionalProperties: false
+      properties:
+        ids_alunos:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: integer
+            minimum: 1
+            maximum: 2147483647
+    FiltroDestinatarios:
+      description: Uma das duas formas; misturar as duas dá 400.
+      oneOf:
+        - $ref: '#/components/schemas/FiltroAlunos'
+        - $ref: '#/components/schemas/FiltroTurma'
+    Variaveis:
+      type: object
+      description: Só `prazo`; `nome_aluno`, `curso` e `termo` vêm do cadastro do aluno na renderização.
+      additionalProperties: false
+      properties:
+        prazo:
+          type: string
+          minLength: 1
+          maxLength: 100
+    CorpoComunicado:
+      type: object
+      description: |
+        Objeto estrito: `id_usuario`, `status` ou qualquer outra chave dá 400. Textos com trim;
+        string vazia vira null.
+      additionalProperties: false
+      properties:
+        titulo:
+          type: [string, 'null']
+          maxLength: 200
+        conteudo:
+          type: [string, 'null']
+          maxLength: 10000
+        prompt_original:
+          type: [string, 'null']
+          maxLength: 600
+          description: Texto do docente que o /gerar envia ao LLM. Não deve conter dados pessoais.
+        canais:
+          type: array
+          maxItems: 2
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/NomeCanal'
+        filtro_destinatarios:
+          oneOf:
+            - $ref: '#/components/schemas/FiltroDestinatarios'
+            - type: 'null'
+        variaveis:
+          oneOf:
+            - $ref: '#/components/schemas/Variaveis'
+            - type: 'null'
+    ComunicadoDetalhe:
+      type: object
+      description: Sem `id_usuario` e sem `data_agendada` (N2).
+      required:
+        - id
+        - titulo
+        - conteudo
+        - prompt_original
+        - status
+        - canais
+        - filtro_destinatarios
+        - variaveis
+        - data_criacao
+        - data_envio
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        titulo:
+          type: [string, 'null']
+        conteudo:
+          type: [string, 'null']
+        prompt_original:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/StatusComunicado'
+        canais:
+          type: array
+          items:
+            $ref: '#/components/schemas/NomeCanal'
+        filtro_destinatarios:
+          description: Forma canônica (sem campos vazios nem repetições); null significa todos os alunos ativos.
+          oneOf:
+            - $ref: '#/components/schemas/FiltroDestinatarios'
+            - type: 'null'
+        variaveis:
+          oneOf:
+            - $ref: '#/components/schemas/Variaveis'
+            - type: 'null'
+        data_criacao:
+          type: string
+          format: date-time
+        data_envio:
+          type: [string, 'null']
+          format: date-time
+    ComunicadoResumo:
+      type: object
+      required: [id, titulo, status, canais, data_criacao, data_envio]
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+        titulo:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/StatusComunicado'
+        canais:
+          type: array
+          items:
+            $ref: '#/components/schemas/NomeCanal'
+        data_criacao:
+          type: string
+          format: date-time
+        data_envio:
+          type: [string, 'null']
+          format: date-time
+    PaginaComunicados:
+      type: object
+      required: [itens, pagina, por_pagina, total]
+      additionalProperties: false
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComunicadoResumo'
+        pagina:
+          type: integer
+        por_pagina:
+          type: integer
+        total:
+          type: integer
+
+    AlunoResumo:
+      type: object
+      description: Sem e-mail e telefone (minimização).
+      required: [id, ra, nome, curso, turma, periodo, termo]
+      properties:
+        id:
+          type: integer
+        ra:
+          type: string
+        nome:
+          type: string
+        curso:
+          type: string
+        turma:
+          type: [string, 'null']
+        periodo:
+          type: string
+        termo:
+          type: string
+    PaginaAlunos:
+      type: object
+      required: [itens, pagina, por_pagina, total]
+      properties:
+        itens:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlunoResumo'
+        pagina:
+          type: integer
+        por_pagina:
+          type: integer
+        total:
+          type: integer
+
+    PedidoPrevia:
+      type: object
+      required: [filtro_destinatarios, canais]
+      additionalProperties: false
+      properties:
+        filtro_destinatarios:
+          oneOf:
+            - $ref: '#/components/schemas/FiltroDestinatarios'
+            - type: 'null'
+        canais:
+          type: array
+          maxItems: 2
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/NomeCanal'
+    PreviaDestinatarios:
+      type: object
+      required: [total, por_canal]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        por_canal:
+          type: object
+          additionalProperties: false
+          properties:
+            email:
+              type: integer
+              minimum: 0
+            whatsapp:
+              type: integer
+              minimum: 0
+
+    Versao:
+      type: object
+      required: [canal, assunto, corpo_template, origem, editado]
+      properties:
+        canal:
+          $ref: '#/components/schemas/NomeCanal'
+        assunto:
+          type: [string, 'null']
+          maxLength: 200
+          description: Null no WhatsApp, que não tem assunto.
+        corpo_template:
+          type: string
+          description: Texto com placeholders da whitelist ({nome_aluno}, {curso}, {prazo}, {termo}).
+        origem:
+          $ref: '#/components/schemas/OrigemVersao'
+        editado:
+          type: boolean
+    EdicaoVersao:
+      type: object
+      additionalProperties: false
+      properties:
+        assunto:
+          type: [string, 'null']
+          maxLength: 200
+        corpo_template:
+          type: string
+          minLength: 1
+
+    ErroRenderizador:
+      description: Erro da validação prévia (T14). Nunca traz dado de aluno.
+      oneOf:
+        - type: object
+          required: [codigo, placeholder, canal, campo]
+          properties:
+            codigo:
+              type: string
+              const: placeholder_desconhecido
+            placeholder:
+              type: string
+              maxLength: 40
+              description: Até 40 caracteres do texto do docente entre chaves.
+            canal:
+              $ref: '#/components/schemas/NomeCanal'
+            campo:
+              type: string
+              enum: [assunto, corpo]
+        - type: object
+          required: [codigo, canal, campo]
+          properties:
+            codigo:
+              type: string
+              const: sintaxe_invalida
+            canal:
+              $ref: '#/components/schemas/NomeCanal'
+            campo:
+              type: string
+              enum: [assunto, corpo]
+        - type: object
+          required: [codigo, placeholder]
+          properties:
+            codigo:
+              type: string
+              const: valor_ausente
+            placeholder:
+              type: string
+              enum: [nome_aluno, curso, prazo, termo]
+            alunos:
+              type: integer
+              minimum: 1
+              description: Só a contagem de alunos afetados.
+    ErroDisparoInvalido:
+      type: object
+      required: [erro, mensagem, erros]
+      properties:
+        erro:
+          type: string
+          const: disparo_invalido
+        mensagem:
+          type: string
+        erros:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErroRenderizador'
+
+    ResumoEnvios:
+      type: object
+      required: [status, contagem, falhas]
+      properties:
+        status:
+          $ref: '#/components/schemas/StatusComunicado'
+        contagem:
+          type: object
+          required: [pendente, enviado, falha]
+          properties:
+            pendente:
+              type: integer
+              minimum: 0
+            enviado:
+              type: integer
+              minimum: 0
+            falha:
+              type: integer
+              minimum: 0
+        falhas:
+          type: array
+          description: Pendente (T18) quais dados do aluno entram em cada item.
+          items:
+            type: object
+            required: [id, canal, mensagem_erro, tentativas]
+            properties:
+              id:
+                type: integer
+                description: Id do envio.
+              canal:
+                $ref: '#/components/schemas/NomeCanal'
+              mensagem_erro:
+                type: [string, 'null']
+              tentativas:
+                type: integer
+                minimum: 0
+
+    ErroRequisicaoInvalida:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: requisicao_invalida
+        mensagem:
+          type: string
+    ErroNaoAutenticado:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: nao_autenticado
+        mensagem:
+          type: string
+    ErroAcessoNegado:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: acesso_negado
+        mensagem:
+          type: string
+    ErroNaoEncontrado:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: nao_encontrado
+        mensagem:
+          type: string
+    ErroConflito:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: conflito
+        mensagem:
+          type: string
+    ErroComunicadoNaoEditavel:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: comunicado_nao_editavel
+        mensagem:
+          type: string
+    ErroCanalIndisponivel:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: canal_indisponivel
+        mensagem:
+          type: string
+    ErroMuitasTentativas:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: muitas_tentativas
+        mensagem:
+          type: string
+    ErroInterno:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: erro_interno
+        mensagem:
+          type: string
+    ErroIaIndisponivel:
+      type: object
+      required: [erro, mensagem]
+      additionalProperties: false
+      properties:
+        erro:
+          type: string
+          const: ia_indisponivel
+        mensagem:
+          type: string

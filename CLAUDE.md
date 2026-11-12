@@ -111,6 +111,8 @@ dnpm run format                          # corrige a formatação
 dnpm run typecheck
 dnpm test
 dnpm run build
+dnpm run lint:api                        # só o lint do openapi.yaml (Redocly; já roda no lint)
+dnpm run gerar:api -w frontend           # tipos do openapi.yaml em frontend/src/api/schema.gerado.ts (versionado)
 
 # Validar o workflow do CI
 docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:latest

@@ -40,7 +40,12 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
+      # Inclui o lint do openapi.yaml (Redocly)
       - run: npm run lint
+      - name: Tipos da API atualizados com o openapi.yaml (T04)
+        run: |
+          npm run gerar:api -w frontend
+          git diff --exit-code frontend/src/api/schema.gerado.ts
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

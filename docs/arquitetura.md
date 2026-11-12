@@ -93,6 +93,7 @@ frontend/   React + Vite + Tailwind
 prompts/    prompts de sistema versionados do LlmProvider
 docs/       documentação, ADRs e TCC
 docker/     Dockerfile.dev (imagem única de desenvolvimento)
+openapi.yaml  contrato HTTP da API (T04)
 ```
 
 - **npm workspaces** na raiz (`backend`, `frontend`): um lockfile, um `npm ci` e um lint compartilhado. Sem nx ou turborepo.
@@ -108,9 +109,33 @@ docker/     Dockerfile.dev (imagem única de desenvolvimento)
   | `migrate` (T03) | sem porta | roda uma vez: `prisma generate`, `migrate deploy` e seed (`SEED_AUTO=false` pula o seed); `api` e `worker` esperam ele terminar com sucesso |
 
 - **CI** (`.github/workflows/ci.yml`), sem segredos e com dois jobs:
-  - `checks`: lint, typecheck, testes e build, com um serviço PostgreSQL só para os testes de integração (banco `acif_test`, desde a T03).
+  - `checks`: lint, typecheck, testes e build, com um serviço PostgreSQL só para os testes de integração (banco `acif_test`, desde a T03). Desde a T04, o lint inclui o do `openapi.yaml` (Redocly), e um passo regenera os tipos da API e falha se `frontend/src/api/schema.gerado.ts` estiver desatualizado.
   - `compose`: sobe o compose e confere o `/health`, a página e o heartbeat do worker; desde a T03, também o `migrate` e as contagens do seed; desde a T06, o login do admin do seed, o `/auth/me` com e sem cookie e o 401 de senha errada; desde a T07, o fluxo do docente: cadastro, 401 enquanto pendente, aprovação pelo admin, login, 403 nas rotas de admin e queda da sessão ao ser bloqueado.
 - As imagens de produção, o backup e a retomada do worker ficam para a T34.
+
+### Contrato da API (T04)
+
+O contrato HTTP fica em [`openapi.yaml`](../openapi.yaml), na raiz, em OpenAPI 3.1.1. Ele é escrito à mão (spec-first) e muda só por `/mudanca-contrato`. As tabelas "Registro para a T04" das seções Auth, Docentes e Comunicados abaixo estão descritas nele.
+
+- **Organização:** uma tag por área; schemas e respostas de erro em `components`. Os erros seguem `{ erro, mensagem }`, com `erro` fixo por resposta (`requisicao_invalida`, `nao_autenticado`, `acesso_negado`, `nao_encontrado`, `conflito`, `comunicado_nao_editavel`, `canal_indisponivel`, `muitas_tentativas`, `erro_interno`). Outros 4xx do Fastify, como 415 e 413, ficam na resposta `default`. A sessão é o `securityScheme` `sessao` (cookie `acif_sessao`), global, e as rotas públicas usam `security: []`. `servers`: `/api` (proxy do Vite, T10) e `http://localhost:3333`.
+- **Status das operações:** `x-acif-status: implementado` descreve o código atual. `planejado` é contrato aprovado em 12/11/2026 e ainda não implementado, com a task dona em `x-acif-task`. Implementar uma operação planejada exatamente como está não é mudança de contrato; alterá-la é. O que ainda não tem decisão aparece como "Pendente" na `description` e cabe à task dona:
+
+  | Operação planejada | Task | Pendente |
+  |---|---|---|
+  | `GET /alunos` (filtros, `busca` por RA ou nome, paginação; sem e-mail e telefone) | T09 | valores de `periodo`; inclusão de inativos; ordem |
+  | `POST /destinatarios/previa` `{ filtro_destinatarios, canais }` → `{ total, por_canal }` | T13 | semântica exata de `total` e `por_canal` |
+  | `POST /comunicados/{id}/gerar` → `200 { versoes }` ou `503 ia_indisponivel` | T22 | sobrescrever versões editadas; sem `prompt_original` ou fora de rascunho; destino do `variaveis.prazo` devolvido pelo LLM |
+  | `PATCH /comunicados/{id}/versoes/{canal}` | T22, T23 | como a versão manual é criada quando a IA falha; limites do `corpo_template` |
+  | `POST /comunicados/{id}/disparar` → `202 { total_envios }` ou `422 disparo_invalido` com os erros do renderizador | T16 | resposta do 2º disparo (409 ou o mesmo 202); 0 destinatários; erro para título, conteúdo ou canal ausentes |
+  | `GET /comunicados/{id}/envios/resumo` → `{ status, contagem, falhas }` | T18 | dados do aluno em cada falha (PII); paginação das falhas |
+
+- **Fora da v0:** o cadastro público e a confirmação de e-mail do aluno (T08) e a configuração de e-mail e WhatsApp (T42), que já exigem `/mudanca-contrato`.
+- **Pendência da T08:** o critério "RA ou e-mail duplicado é rejeitado" conflita com o padrão da T07 de não revelar se uma conta existe (mesma resposta para cadastro novo e duplicado). A T08 precisa decidir entre rejeitar com erro explícito, que permite enumerar alunos, ou responder igual e avisar por e-mail. Além disso, o schema não tem onde guardar o token de confirmação de e-mail.
+- **Lint:** `npm run lint:api` (Redocly CLI, em `npm run lint`), configurado em `redocly.yaml` sem telemetria. Duas regras do `recommended` ficam desligadas: `operation-4xx-response` (`/health` e `/auth/logout` não têm 4xx) e `no-server-example.com` (o servidor é local, ADR 0005).
+- **Divergência com o backend:** `backend/test/contrato-openapi.test.ts`, sem banco, com repositórios em memória. Ele confere que as rotas registradas no Fastify são exatamente as operações `implementado` do spec e valida as respostas reais (sucesso e erros, inclusive 415, 429 e 500) contra o schema com Ajv (JSON Schema 2020-12). Toda operação implementada precisa ser exercitada.
+- **Tipos no front (critério 1):** `npm run gerar:api -w frontend` roda o `openapi-typescript` e gera `frontend/src/api/schema.gerado.ts`, versionado e fora do ESLint e do Prettier. O CI regenera e falha se houver diff. `frontend/src/api/tipos.ts` expõe aliases, e `frontend/src/api/cliente.ts` cria o cliente `openapi-fetch` (base `/api`), em que caminho, parâmetros e corpos fora do contrato não compilam (`tipos.test.ts`, com `@ts-expect-error`).
+- **Mocks no front (critério 2):** `frontend/src/mocks/handlers.ts` usa o `openapi-msw` (MSW 3), tipado pelos mesmos `paths`, com dados sintéticos fixos de `mocks/dados.ts`, só para as operações implementadas. `mocks/handlers.test.ts` confere que há exatamente um handler por operação implementada e valida cada resposta contra o spec. O worker do MSW no navegador fica para a T10.
+- **Override de dependência:** o `openapi-typescript` 7.13.0 declara peer `typescript ^5.x`. O `package.json` da raiz tem `overrides` para usar o TypeScript 6.0.3 do projeto; o gerador foi testado com ele, e o passo de diff do CI acusa se uma versão futura quebrar a geração.
 
 ### Auth (T06)
 

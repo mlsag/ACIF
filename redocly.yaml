@@ -1,0 +1,9 @@
+# Lint do openapi.yaml (T04): npm run lint:api. Sem telemetria.
+telemetry: off
+extends:
+  - recommended
+rules:
+  # /health e /auth/logout não têm 4xx próprio: o spec descreve o código como ele é.
+  operation-4xx-response: off
+  # Tudo roda localmente até a apresentação (ADR 0005); localhost é o servidor real.
+  no-server-example.com: off
