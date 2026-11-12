@@ -22,6 +22,7 @@ const configBase: ConfigAuth = {
   sessaoHoras: 8,
   cookieSecure: false,
   loginRateLimitMax: 1000,
+  cadastroRateLimitMax: 1000,
   usandoSegredoDev: false,
 };
 

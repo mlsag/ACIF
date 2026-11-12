@@ -75,6 +75,7 @@ services:
       SESSAO_HORAS: ${SESSAO_HORAS:-8}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-10}
+      CADASTRO_RATE_LIMIT_MAX: ${CADASTRO_RATE_LIMIT_MAX:-5}
     ports:
       - '127.0.0.1:${API_HOST_PORT:-3333}:3333'
     depends_on:

@@ -59,16 +59,16 @@ export const esquemaCorpoComunicado = z.strictObject({
 });
 
 /** Inteiro positivo em texto, sem sinal, espaço, decimal ou notação científica. */
-const inteiroTexto = (max: number) =>
+export const inteiroTexto = (max: number) =>
   z
     .string()
     .regex(/^[1-9]\d{0,9}$/)
     .transform(Number)
     .pipe(z.number().max(max));
 
-const esquemaParamId = z.object({ id: inteiroTexto(MAX_ID_INT4) });
+export const esquemaParamId = z.object({ id: inteiroTexto(MAX_ID_INT4) });
 
-const esquemaQueryLista = z.object({
+export const esquemaQueryLista = z.object({
   pagina: inteiroTexto(PAGINA_MAX).default(1),
   por_pagina: inteiroTexto(POR_PAGINA_MAX).default(POR_PAGINA_PADRAO),
 });

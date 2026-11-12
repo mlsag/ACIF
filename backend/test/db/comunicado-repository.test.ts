@@ -81,6 +81,7 @@ describe.skipIf(!URL_TESTE)('comunicados com banco real', () => {
           sessaoHoras: 8,
           cookieSecure: false,
           loginRateLimitMax: 1000,
+          cadastroRateLimitMax: 1000,
           usandoSegredoDev: false,
         },
         authService,

@@ -163,8 +163,8 @@ tasks:
     aceite:
       - "Docente pendente não loga"
       - "O responsável aprova ou bloqueia"
-    status: todo
-    branch: null
+    status: in_progress
+    branch: task/T07-docentes
     pr: null
     concluida_em: null
   - id: T08

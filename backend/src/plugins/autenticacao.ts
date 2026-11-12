@@ -13,6 +13,12 @@ export const RESPOSTA_NAO_AUTENTICADO = {
   mensagem: 'Credenciais inválidas ou sessão expirada.',
 } as const;
 
+/** 403 de rota só do admin (T07). Só é usado depois de `autenticar`, com sessão válida. */
+export const RESPOSTA_ACESSO_NEGADO = {
+  erro: 'acesso_negado',
+  mensagem: 'Acesso restrito ao administrador.',
+} as const;
+
 /** O JWT leva só o id (sub) e o papel: sem e-mail, nome ou outro dado pessoal. */
 export interface PayloadSessao {
   sub: string;
@@ -34,6 +40,8 @@ declare module 'fastify' {
   interface FastifyInstance {
     /** preHandler reutilizável: exige sessão válida de usuário ativo e aprovado. */
     autenticar: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    /** preHandler para depois de `autenticar`: exige papel admin (403 para docente). */
+    exigirAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
 
@@ -91,6 +99,16 @@ export function registrarAutenticacao(
         return responderNaoAutenticado(reply);
       }
       request.usuario = usuario;
+    },
+  );
+
+  // O papel vem do banco (preenchido por `autenticar`), não do JWT.
+  app.decorate(
+    'exigirAdmin',
+    async function exigirAdmin(request: FastifyRequest, reply: FastifyReply) {
+      if (request.usuario?.papel !== 'admin') {
+        return reply.code(403).send(RESPOSTA_ACESSO_NEGADO);
+      }
     },
   );
 }

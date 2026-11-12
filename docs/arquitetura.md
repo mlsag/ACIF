@@ -109,7 +109,7 @@ docker/     Dockerfile.dev (imagem única de desenvolvimento)
 
 - **CI** (`.github/workflows/ci.yml`), sem segredos e com dois jobs:
   - `checks`: lint, typecheck, testes e build, com um serviço PostgreSQL só para os testes de integração (banco `acif_test`, desde a T03).
-  - `compose`: sobe o compose e confere o `/health`, a página e o heartbeat do worker; desde a T03, também o `migrate` e as contagens do seed; desde a T06, o login do admin do seed, o `/auth/me` com e sem cookie e o 401 de senha errada.
+  - `compose`: sobe o compose e confere o `/health`, a página e o heartbeat do worker; desde a T03, também o `migrate` e as contagens do seed; desde a T06, o login do admin do seed, o `/auth/me` com e sem cookie e o 401 de senha errada; desde a T07, o fluxo do docente: cadastro, 401 enquanto pendente, aprovação pelo admin, login, 403 nas rotas de admin e queda da sessão ao ser bloqueado.
 - As imagens de produção, o backup e a retomada do worker ficam para a T34.
 
 ### Auth (T06)
@@ -130,7 +130,29 @@ Camadas: `rotas/auth.ts` (Zod) → `AuthService` → `UsuarioRepository` (Prisma
 - **Front x API (decisão para a T10):** o front usa o **proxy do Vite** (`/api` → `api:3333`), ficando na mesma origem da API. **Sem CORS** e sem `@fastify/cors`. CSRF fica coberto pelo `SameSite=Strict` e pelo corpo JSON nas rotas que mudam estado.
 - **Logs sem PII:** a URL é logada sem a query string, e corpo, headers e cookies não são logados. O handler de erro não ecoa mensagens de validação nem do banco.
 - **E-mail em minúsculas:** o login normaliza o e-mail antes da busca. Quem grava usuários (T07) precisa gravar o e-mail também em minúsculas.
-- Variáveis: `JWT_SECRET`, `SESSAO_HORAS` (8), `COOKIE_SECURE` (`true` em produção), `LOGIN_RATE_LIMIT_MAX` (10). Veja o `.env.example`.
+- Variáveis: `JWT_SECRET`, `SESSAO_HORAS` (8), `COOKIE_SECURE` (`true` em produção), `LOGIN_RATE_LIMIT_MAX` (10) e, desde a T07, `CADASTRO_RATE_LIMIT_MAX` (5 por hora). Veja o `.env.example`.
+
+### Docentes (T07)
+
+Camadas: `rotas/docentes.ts` (Zod) → `DocenteService` → `UsuarioRepository` (Prisma). Conforme o [ADR 0008](adr/0008-aprovacao-docentes.md), quem aprova é o admin (a coordenação; a diretoria administra a coordenação), sem novos papéis. Não houve mudança de contrato: o fluxo usa `usuarios.papel`, `status_aprovacao`, `aprovado_por` e `data_cadastro`, já existentes. Registro para a T04 documentar no `openapi.yaml`:
+
+| Método e caminho | Quem chama | Entrada | Saída | Códigos |
+|---|---|---|---|---|
+| `POST /docentes/cadastro` | público, com rate limit | JSON estrito `{ nome, email, senha }`. `nome` com trim, de 2 a 120 caracteres; `email` com trim e minúsculas, até 254; `senha` de 12 a 128 caracteres, sem regras de composição. Qualquer outra chave (ex.: `papel`, `status_aprovacao`) dá 400 | `202 { mensagem }`, igual para conta nova e e-mail já cadastrado | 202, 400, 429 |
+| `GET /docentes` | só admin | query `status?` (`pendente`, `aprovado` ou `bloqueado`), `pagina` e `por_pagina` como na T12 | `200 { itens, pagina, por_pagina, total }`; cada item tem `id, nome, email, status_aprovacao, data_cadastro`. Só `papel = 'docente'`, sem senha. Ordem: `data_cadastro` desc, `id` desc | 200, 400, 401, 403 |
+| `POST /docentes/:id/aprovar` | só admin | `id` inteiro de 1 a 2147483647 | `200` com o docente (mesmo formato do item). Também reativa um bloqueado | 200, 400, 401, 403, 404, 409 |
+| `POST /docentes/:id/bloquear` | só admin | idem | idem | 200, 400, 401, 403, 404, 409 |
+
+- **Conta nova:** sempre `papel = 'docente'`, `status_aprovacao = 'pendente'`, `ativo = true`, e-mail em minúsculas e senha com hash argon2id. Pendente não loga: o login da T06 dá o 401 genérico.
+- **E-mail duplicado não é revelado:** o cadastro responde o mesmo `202` com a mesma mensagem, inclusive para o e-mail de um admin, e não altera a conta existente. O hash argon2id roda sempre, antes de gravar, para o tempo de resposta também não revelar. A unicidade é garantida pelo banco: a violação (`P2002`) vira `duplicado` dentro do repository, o que também resolve dois cadastros simultâneos. Custo aceito: quem esqueceu que já se cadastrou não fica sabendo pela API e procura a coordenação, como a tela 01 já orienta.
+- **Rate limit do cadastro:** `CADASTRO_RATE_LIMIT_MAX` por hora, por IP (padrão 5), com o mesmo `@fastify/rate-limit` em memória do login. Veja o risco R15.
+- **Transições:** `pendente → aprovado`, `pendente → bloqueado` (rejeição), `aprovado → bloqueado` e `bloqueado → aprovado` (reativação). Não há volta para `pendente`. Cada decisão é um único `updateMany` condicionado a `{ id, papel: 'docente', status_aprovacao IN origens }`, atômico. Pedir o status em que o docente já está responde `200` sem nova escrita (idempotente, para o clique duplo na T10). Se outro admin mudar o status entre o UPDATE e a releitura, a resposta é `409 { "erro": "conflito" }`.
+- **`aprovado_por`:** guarda o **admin da última decisão**, seja aprovação ou bloqueio (decisão do aluno, 12/11/2026). Num docente bloqueado, aponta quem bloqueou. Repetir a decisão não reescreve o campo.
+- **O admin não bloqueia a si mesmo nem outro admin:** as decisões só alcançam `papel = 'docente'`. O id de um admin dá o mesmo `404 { "erro": "nao_encontrado" }` de um id inexistente. Assim, nunca se perde o último admin pela API. O campo `ativo` não é alterado pela T07.
+- **Só admin:** o preHandler `app.exigirAdmin` (em `plugins/autenticacao.ts`), usado depois do `app.autenticar`, responde `403 { "erro": "acesso_negado", "mensagem": "Acesso restrito ao administrador." }`. O papel vem do banco a cada requisição, não do JWT: um token com `papel: admin` forjado ou desatualizado não passa.
+- **Sessão do bloqueado:** pela checagem no banco da T06, o docente bloqueado recebe 401 já na próxima requisição, mesmo com o cookie ainda válido.
+- **Logs sem PII:** nome, e-mail e senha não são logados. Cada decisão que altera o status gera um log só com ids: `{ evento: 'docente_aprovado' | 'docente_bloqueado', id_docente, id_admin }`.
+- **LGPD:** nome e e-mail de docente são dados pessoais. Só o admin os vê. Testes, E2E e demo usam só `@example.com`. Não há exclusão de docente nesta entrega (risco R17).
 
 ### Comunicados (T12)
 
