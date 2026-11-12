@@ -26,3 +26,7 @@ export type StatusEnvio = (typeof STATUS_ENVIO)[number];
 /** Nomes em `canais.nome`, que são as chaves do registry de CanalEnvio. */
 export const NOMES_CANAIS = ['email', 'whatsapp'] as const;
 export type NomeCanal = (typeof NOMES_CANAIS)[number];
+
+/** Whitelist de placeholders (sem chaves). A validação nos textos é da T14 (renderizador). */
+export const PLACEHOLDERS = ['nome_aluno', 'curso', 'prazo', 'termo'] as const;
+export type Placeholder = (typeof PLACEHOLDERS)[number];

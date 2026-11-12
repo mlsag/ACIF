@@ -3,7 +3,9 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import type { ConfigAuth } from './config.js';
 import { registrarAutenticacao } from './plugins/autenticacao.js';
 import { rotasAuth } from './rotas/auth.js';
+import { rotasComunicados } from './rotas/comunicados.js';
 import type { AuthService } from './services/auth-service.js';
+import type { ComunicadoService } from './services/comunicado-service.js';
 
 export interface DependenciasAuth {
   config: ConfigAuth;
@@ -15,6 +17,8 @@ export interface OpcoesApp {
   logger?: boolean | Exclude<FastifyServerOptions['logger'], boolean | undefined>;
   /** Sem `auth`, a aplicação sobe só com /health (testes que não precisam de banco). */
   auth?: DependenciasAuth;
+  /** Rotas de comunicados (T12); só são registradas junto com `auth`, que elas exigem. */
+  comunicados?: { comunicadoService: ComunicadoService };
 }
 
 /** URL sem query string: parâmetros de query nunca vão para o log. */
@@ -73,6 +77,11 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     registrarAutenticacao(app, config, authService);
     // Rotas dentro de um plugin: são registradas depois do rate limit, cujo hook onRoute precisa existir antes.
     app.register(async (instancia) => rotasAuth(instancia, config, authService));
+
+    const comunicados = opcoes.comunicados;
+    if (comunicados) {
+      app.register(async (instancia) => rotasComunicados(instancia, comunicados.comunicadoService));
+    }
   }
 
   return app;
