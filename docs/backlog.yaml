@@ -259,7 +259,7 @@ tasks:
       - "Variável sem valor bloqueia o disparo"
     status: in_progress
     branch: task/T14-renderizador
-    pr: null
+    pr: 14
     concluida_em: null
   - id: T15
     marco: M1
