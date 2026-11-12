@@ -4,8 +4,10 @@ import type { ConfigAuth } from './config.js';
 import { registrarAutenticacao } from './plugins/autenticacao.js';
 import { rotasAuth } from './rotas/auth.js';
 import { rotasComunicados } from './rotas/comunicados.js';
+import { rotasDocentes } from './rotas/docentes.js';
 import type { AuthService } from './services/auth-service.js';
 import type { ComunicadoService } from './services/comunicado-service.js';
+import type { DocenteService } from './services/docente-service.js';
 
 export interface DependenciasAuth {
   config: ConfigAuth;
@@ -19,6 +21,8 @@ export interface OpcoesApp {
   auth?: DependenciasAuth;
   /** Rotas de comunicados (T12); só são registradas junto com `auth`, que elas exigem. */
   comunicados?: { comunicadoService: ComunicadoService };
+  /** Cadastro e aprovação de docentes (T07); só são registradas junto com `auth`. */
+  docentes?: { docenteService: DocenteService };
 }
 
 /** URL sem query string: parâmetros de query nunca vão para o log. */
@@ -72,7 +76,7 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
 
   if (opcoes.auth) {
     const { config, authService } = opcoes.auth;
-    // global: false — só as rotas com config.rateLimit são limitadas (por ora, o login).
+    // global: false — só as rotas com config.rateLimit são limitadas (login e cadastro de docente).
     app.register(fastifyRateLimit, { global: false });
     registrarAutenticacao(app, config, authService);
     // Rotas dentro de um plugin: são registradas depois do rate limit, cujo hook onRoute precisa existir antes.
@@ -81,6 +85,11 @@ export function buildApp(opcoes: OpcoesApp = {}): FastifyInstance {
     const comunicados = opcoes.comunicados;
     if (comunicados) {
       app.register(async (instancia) => rotasComunicados(instancia, comunicados.comunicadoService));
+    }
+
+    const docentes = opcoes.docentes;
+    if (docentes) {
+      app.register(async (instancia) => rotasDocentes(instancia, config, docentes.docenteService));
     }
   }
 

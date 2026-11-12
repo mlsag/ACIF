@@ -87,6 +87,41 @@ jobs:
           errada=$(status -H 'Content-Type: application/json' \
             -d '{"email":"admin@example.com","senha":"senha-errada-qualquer"}' "$api/auth/login")
           echo "login com senha errada: $errada"; test "$errada" = "401"
+      - name: Docentes de ponta a ponta (T07)
+        # Docente sintético (example.com). Mostra só os status; corpos e tokens não vão para o log.
+        run: |
+          api=http://127.0.0.1:3333
+          admin="$RUNNER_TEMP/admin.txt"
+          docente="$RUNNER_TEMP/docente.txt"
+          email='t07.e2e@example.com'
+          senha='senha-sintetica-t07-e2e'
+          status() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+          json=(-H 'Content-Type: application/json')
+          cadastro=$(status "${json[@]}" \
+            -d "{\"nome\":\"Docente E2E Sintetico\",\"email\":\"$email\",\"senha\":\"$senha\"}" \
+            "$api/docentes/cadastro")
+          echo "cadastro: $cadastro"; test "$cadastro" = "202"
+          pendente=$(status "${json[@]}" -d "{\"email\":\"$email\",\"senha\":\"$senha\"}" "$api/auth/login")
+          echo "login do docente pendente: $pendente"; test "$pendente" = "401"
+          login=$(status -c "$admin" "${json[@]}" \
+            -d '{"email":"admin@example.com","senha":"acif-dev-somente-local"}' "$api/auth/login")
+          echo "login do admin: $login"; test "$login" = "200"
+          id=$(curl -fsS -b "$admin" "$api/docentes?status=pendente&por_pagina=50" \
+            | jq -r --arg e "$email" '.itens[] | select(.email == $e) | .id')
+          test -n "$id"
+          aprovar=$(status -X POST -b "$admin" "$api/docentes/$id/aprovar")
+          echo "aprovar: $aprovar"; test "$aprovar" = "200"
+          entrou=$(status -c "$docente" "${json[@]}" \
+            -d "{\"email\":\"$email\",\"senha\":\"$senha\"}" "$api/auth/login")
+          echo "login do docente aprovado: $entrou"; test "$entrou" = "200"
+          me=$(status -b "$docente" "$api/auth/me")
+          echo "/auth/me do docente: $me"; test "$me" = "200"
+          proibido=$(status -b "$docente" "$api/docentes")
+          echo "docente em /docentes: $proibido"; test "$proibido" = "403"
+          bloquear=$(status -X POST -b "$admin" "$api/docentes/$id/bloquear")
+          echo "bloquear: $bloquear"; test "$bloquear" = "200"
+          caiu=$(status -b "$docente" "$api/auth/me")
+          echo "/auth/me do docente bloqueado: $caiu"; test "$caiu" = "401"
       - run: curl -fsS http://127.0.0.1:5173/ | grep -i '<title>ACIF</title>'
       - name: Worker emitiu heartbeat
         run: |

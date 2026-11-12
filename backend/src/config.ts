@@ -9,6 +9,8 @@ export interface ConfigAuth {
   sessaoHoras: number;
   cookieSecure: boolean;
   loginRateLimitMax: number;
+  /** Cadastros públicos de docente por hora, por IP (T07). */
+  cadastroRateLimitMax: number;
   /** true quando o segredo é o padrão de desenvolvimento (o server avisa no log). */
   usandoSegredoDev: boolean;
 }
@@ -21,6 +23,7 @@ const esquemaEnv = z.object({
   SESSAO_HORAS: z.coerce.number().int().min(1).max(24).default(8),
   COOKIE_SECURE: booleano.optional(),
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(10),
+  CADASTRO_RATE_LIMIT_MAX: z.coerce.number().int().min(1).default(5),
 });
 
 /** Lê e valida a configuração de auth. Variáveis vazias contam como ausentes. */
@@ -53,6 +56,7 @@ export function lerConfigAuth(env: NodeJS.ProcessEnv = process.env): ConfigAuth 
     sessaoHoras: dados.SESSAO_HORAS,
     cookieSecure: dados.COOKIE_SECURE ?? producao,
     loginRateLimitMax: dados.LOGIN_RATE_LIMIT_MAX,
+    cadastroRateLimitMax: dados.CADASTRO_RATE_LIMIT_MAX,
     usandoSegredoDev: jwtSecret === JWT_SECRET_DEV,
   };
 }

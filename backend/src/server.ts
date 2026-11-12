@@ -6,13 +6,15 @@ import { criarPrismaClient } from './repositories/prisma.js';
 import { PrismaUsuarioRepository } from './repositories/usuario-repository.js';
 import { AuthService } from './services/auth-service.js';
 import { ComunicadoService } from './services/comunicado-service.js';
+import { DocenteService } from './services/docente-service.js';
 
 const porta = Number(process.env.API_PORT ?? 3333);
 const host = process.env.API_HOST ?? '0.0.0.0';
 
 const config = lerConfigAuth();
 const prisma = criarPrismaClient();
-const authService = new AuthService(new PrismaUsuarioRepository(prisma));
+const usuarioRepository = new PrismaUsuarioRepository(prisma);
+const authService = new AuthService(usuarioRepository);
 await authService.aquecer();
 
 const comunicadoService = new ComunicadoService(
@@ -24,6 +26,7 @@ const app = buildApp({
   logger: true,
   auth: { config, authService },
   comunicados: { comunicadoService },
+  docentes: { docenteService: new DocenteService(usuarioRepository) },
 });
 
 if (config.usandoSegredoDev) {

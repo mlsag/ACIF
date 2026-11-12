@@ -169,3 +169,30 @@ Não é uma task do backlog. Preparou o repositório para o fluxo ADD.
 - **Lições:**
   - Um módulo puro permitiu provar os critérios do disparo com testes unitários antes de a T16 existir.
   - Testar casos adversos fora da suíte revelou um teste instável antigo, que poderia derrubar o CI ao acaso.
+
+## T07 — Cadastro de docente + aprovação (12/11/2026)
+
+- **PR:** #16 (aberto; o merge é do aluno). CI verde no commit 1b986d5, jobs `checks` e `compose` (este inclui o passo novo "Docentes de ponta a ponta (T07)").
+- **O que a IA gerou:**
+  - O agente `backend` propôs o plano e implementou `POST /docentes/cadastro` (público, rate limit de 5 por hora por IP, conta nasce pendente, `202` idêntico para e-mail duplicado, para não enumerar contas).
+  - Implementou também `GET /docentes`, `POST /docentes/:id/aprovar` e `POST /docentes/:id/bloquear`, só para admin (403 para docente), com a guarda `exigirAdmin`. As ações só alcançam o papel docente, então o id de um admin dá 404.
+  - O bloqueio derruba a sessão aberta, pela checagem por requisição da T06. Os logs trazem só ids.
+  - Escreveu 43 testes de rota, 9 com o banco real e o passo E2E no CI.
+  - Desvios do agente, aceitos pelo aluno: o `docker-compose.yml` passa `CADASTRO_RATE_LIMIT_MAX`; `409 conflito` em corrida entre admins; exports de validadores em `rotas/comunicados.ts`; 4 testes antigos ganharam uma linha de config.
+  - Riscos registrados: R15 ampliado, R16 (cadastro em massa) e R17 (sem exclusão de docente).
+  - O agente `qa` revisou com evidências e com casos adversos (cadastro com o e-mail do admin não altera o admin; `__proto__` e `papel` no corpo dão 400; e-mail com maiúsculas não duplica a conta; a sessão aberta cai após o bloqueio) e aprovou sem bloqueantes.
+  - Achados não bloqueantes da revisão:
+    - o cadastro duplicado responde cerca de 10 ms mais rápido que o novo, e requisições 400 contam no rate limit; ambos documentados no fechamento (arquitetura e R15);
+    - o passo E2E usa e-mail fixo e só passa num banco novo;
+    - casos sem teste automatizado: `__proto__`, e-mail com maiúsculas no cadastro e senha fora do BMP.
+- **O que o aluno decidiu, corrigiu ou rejeitou:**
+  - Escolheu o cadastro público, com a conta nascendo pendente.
+  - Escolheu não restringir o domínio do e-mail.
+  - Escolheu senha de 12 a 128 caracteres, sem regras de composição.
+  - Escolheu que `aprovado_por` guarda o admin da última decisão (aprovação ou bloqueio).
+  - Abriu o PR #16.
+  - Nada foi rejeitado, segundo o aluno.
+- **Prompts relevantes:** nenhum além dos comandos do fluxo (`/proxima-task`, `/executar-task`, `/revisar-task`, `/fechar-task`) e das respostas às perguntas de decisão. A T13 foi pedida primeiro no `/proxima-task`, mas estava bloqueada pela cadeia T15 → T08 → T09; a T07 foi escolhida por não depender de conta externa.
+- **Lições:**
+  - Medir o tempo de resposta na revisão mostrou que a doc prometia mais do que o código entregava: o hash sempre executado aproxima os tempos, mas não os iguala.
+  - Restringir as ações ao papel docente na própria consulta protege o admin por construção, sem uma checagem separada que pudesse ser esquecida.
