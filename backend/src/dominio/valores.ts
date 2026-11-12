@@ -27,6 +27,9 @@ export type StatusEnvio = (typeof STATUS_ENVIO)[number];
 export const NOMES_CANAIS = ['email', 'whatsapp'] as const;
 export type NomeCanal = (typeof NOMES_CANAIS)[number];
 
-/** Whitelist de placeholders (sem chaves). A validação nos textos é da T14 (renderizador). */
+/**
+ * Whitelist de placeholders (sem chaves). A sintaxe, a validação prévia do disparo e a
+ * renderização ficam em `dominio/renderizador.ts` (T14), que mapeia a origem de cada valor.
+ */
 export const PLACEHOLDERS = ['nome_aluno', 'curso', 'prazo', 'termo'] as const;
 export type Placeholder = (typeof PLACEHOLDERS)[number];

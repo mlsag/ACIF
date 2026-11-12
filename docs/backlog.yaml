@@ -257,8 +257,8 @@ tasks:
     aceite:
       - "Variável desconhecida bloqueia o disparo"
       - "Variável sem valor bloqueia o disparo"
-    status: todo
-    branch: null
+    status: in_progress
+    branch: task/T14-renderizador
     pr: null
     concluida_em: null
   - id: T15
