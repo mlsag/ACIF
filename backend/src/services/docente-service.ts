@@ -33,7 +33,8 @@ export class DocenteService {
 
   /**
    * Cadastra o docente como `pendente`. Não devolve se o e-mail já existia: o hash roda sempre,
-   * antes de tentar gravar, para o tempo de resposta também não revelar a conta.
+   * antes de tentar gravar, para aproximar o tempo de resposta (resta uma diferença pequena; ver
+   * "Docentes (T07)" em docs/arquitetura.md).
    */
   async cadastrar(nome: string, email: string, senha: string): Promise<void> {
     const senhaHash = await argon2.hash(senha, { type: argon2.argon2id });
