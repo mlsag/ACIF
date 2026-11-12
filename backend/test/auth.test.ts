@@ -336,8 +336,13 @@ describe('critério 2: rota protegida bloqueia sem sessão', () => {
   });
 
   it('token com a assinatura alterada: 401', async () => {
-    const ultimo = tokenValido.at(-1) === 'A' ? 'B' : 'A';
-    await esperar401(me(ctx.app, `${tokenValido.slice(0, -1)}${ultimo}`));
+    // Altera o 1º caractere da assinatura, não o último: no HS256 (43 caracteres base64url), os
+    // 2 bits mais baixos do último caractere são enchimento, e trocá-lo às vezes não muda os bytes.
+    const [header, payload, assinatura] = tokenValido.split('.') as [string, string, string];
+    const primeiro = assinatura[0] === 'A' ? 'B' : 'A';
+    const alterado = `${header}.${payload}.${primeiro}${assinatura.slice(1)}`;
+    expect(alterado).not.toBe(tokenValido);
+    await esperar401(me(ctx.app, alterado));
   });
 
   it('token assinado com outro segredo: 401', async () => {
