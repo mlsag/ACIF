@@ -165,7 +165,7 @@ tasks:
       - "O responsável aprova ou bloqueia"
     status: in_progress
     branch: task/T07-docentes
-    pr: null
+    pr: 16
     concluida_em: null
   - id: T08
     marco: M1
