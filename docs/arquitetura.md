@@ -159,6 +159,24 @@ Camadas: `rotas/comunicados.ts` (Zod) → `ComunicadoService` → `ComunicadoRep
 - **Para a T16:** exigir `titulo`, `conteudo` e ao menos um canal; checar de novo se os canais seguem ativos (o admin pode desativar um canal depois de gravado no rascunho); tirar o comunicado de `rascunho` com um `updateMany` condicionado a `status = 'rascunho'`. A partir daí, a T12 responde 409 sem mudança.
 - **Pendência para a T13 (risco):** os valores de período divergem. O seed grava `Manhã`/`Noite`, e o protótipo (tela 03) mostra `Matutino`/`Vespertino`/`Noturno`. A T12 não valida os valores do filtro contra uma lista fixa; a T13 (e o cadastro da T09) precisam alinhar os valores, senão o filtro por período não casa com os alunos.
 
+### Renderizador (T14)
+
+Módulo puro em `backend/src/dominio/renderizador.ts`: sem Prisma, sem rede e sem log. Não há rota nova. O rascunho (T12) continua aceitando qualquer texto; o bloqueio acontece no disparo.
+
+- **Sintaxe estrita:** um placeholder é exatamente `{nome}`, com `nome` em `PLACEHOLDERS` (`{nome_aluno}`, `{curso}`, `{prazo}`, `{termo}`), com diferença entre maiúsculas e minúsculas. `{x}`, `{ nome_aluno}`, `{NOME_ALUNO}` e `{}` são `placeholder_desconhecido`. `{{x}}`, chave aberta ou fechada solta e chaves aninhadas são `sintaxe_invalida`. Um placeholder pode se repetir.
+- **Limitação: sem escape.** Não há como escrever uma chave literal no texto. Chave fora de um placeholder válido bloqueia o disparo.
+- **Origem dos valores:** `nome_aluno` → `alunos.nome`, `curso` → `alunos.curso`, `termo` → `alunos.termo`, `prazo` → `comunicados.variaveis.prazo`. O mapa usa `satisfies Record<Placeholder, …>`: placeholder novo sem origem não compila. Os valores passam por trim, e vazio conta como ausente. O renderizador recebe só `{ nome, curso, termo }` do aluno.
+- **API:**
+  - `analisarTemplate(texto)`: `{ ok:true, placeholders }` ou `{ ok:false, erros }`. Serve também à T21/T22 para conferir as versões geradas.
+  - `validarDisparo({ textos, variaveis, alunos })`: validação prévia. `textos` são o `assunto` e o `corpo` de cada versão, com o canal; `alunos` são os destinatários já resolvidos (T13). Bloqueia por placeholder desconhecido, sintaxe inválida, `{prazo}` usado sem valor, ou placeholder usado sem valor para algum aluno; neste caso, o disparo inteiro para, e o erro traz só a contagem de alunos afetados. Placeholder que o texto não usa não exige valor.
+  - `renderizar(texto, { aluno, variaveis })`: substitui todas as ocorrências numa passada só (o valor inserido não é lido de novo). Não lança: template inválido ou valor ausente viram `ok:false`. Gera texto puro; escapar HTML é papel do `EmailCanal` (T15), se ele enviar HTML.
+- **Erros sem dado de aluno:** `{ codigo: 'placeholder_desconhecido', placeholder, canal, campo }`, `{ codigo: 'sintaxe_invalida', canal, campo }` e `{ codigo: 'valor_ausente', placeholder, alunos? }`. Nunca trazem nome, id ou outro dado de aluno. Exceção quanto ao texto do docente: em `placeholder_desconhecido`, o campo `placeholder` repete até 40 caracteres (`MAX_NOME_NO_ERRO`) do que estava entre chaves, para o docente achar e corrigir o próprio texto. Não é dado de aluno, mas é texto livre: a T16 devolve esses erros na resposta e **não deve logá-los**.
+- **Contrato que a T16 assume:** dentro da transação do disparo, resolver o filtro em alunos e só então chamar `validarDisparo` com esses alunos. Se der `ok:false`, responder **422 com a lista de erros**, sem criar envios e sem mudar o status do comunicado.
+- **Pontos para a T16/T17:**
+  - `variaveis` deve passar por `esquemaVariaveis` (Zod, em `backend/src/dominio/comunicado.ts`) antes de chegar ao renderizador, como o `ComunicadoService` já faz ao montar o detalhe. O renderizador confia no tipo: se `prazo` não for string, o trim lançaria `TypeError`.
+  - `validarDisparo` com `alunos: []` devolve `ok:true`. O caso "0 destinatários" é responsabilidade da T16.
+- **Para a T17:** o worker chama `renderizar` por envio. `ok:false` (por exemplo, o cadastro do aluno mudou depois do disparo) vira `falha` naquele envio, sem derrubar o lote.
+
 ## 4. Modelo de dados
 
 O ponto de partida é [`diagrama_classe.png`](design/diagramas/diagrama_classe.png). Apesar do nome, ele é o ER original. O modelo abaixo acrescenta os ajustes aprovados.
@@ -381,12 +399,12 @@ sequenceDiagram
 
 `POST /comunicados/:id/disparar` faz, numa transação:
 
-1. valida que toda variável tem valor para todos os alunos;
-2. congela as versões;
-3. resolve o filtro em alunos;
+1. resolve o filtro em alunos;
+2. valida que toda variável tem valor para todos esses alunos (`validarDisparo`, que recebe os alunos já resolvidos; ver "Renderizador (T14)");
+3. congela as versões;
 4. cria os envios pendentes.
 
-O worker renderiza localmente com `render(template, {aluno, comunicado})`, chama `CanalEnvio.enviar()` e grava o status.
+O worker renderiza localmente com `renderizar(texto, { aluno, variaveis })`, chama `CanalEnvio.enviar()` e grava o status.
 
 **Reserva do envio:** o `SKIP LOCKED` fica numa transação curta, que incrementa `tentativas` e adia `proxima_tentativa`. O envio externo acontece fora dessa transação, para não prender a conexão durante a chamada ao provedor. Se o worker cair, o envio volta a ficar disponível quando esse prazo vencer. A consequência é entrega *at-least-once*: uma queda entre o envio e a gravação do status pode repetir uma mensagem.
 
@@ -403,7 +421,7 @@ sequenceDiagram
 
     D->>A: POST /comunicados/:id/disparar
     A->>E: Disparar
-    E->>B: Transação com validação, congelamento e envios pendentes
+    E->>B: Transação com resolução dos alunos, validação, congelamento e envios pendentes
     Note over E,B: A chave única impede envios duplicados
     E-->>D: Disparo aceito
 
